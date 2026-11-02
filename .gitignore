@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# All local data (only the README and DVC pointer files are tracked)
+/data/*
+!/data/README.md
+!/data/.gitignore
+!/data/*.dvc
+
+# Medical image formats, wherever they end up
+*.dcm
+*.nii
+*.nii.gz
+
+# Generated ML artifacts
+mlruns/
+mlflow.db
+artifacts/
+/models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.parquet
+.ipynb_checkpoints/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+tmp/
+temp/

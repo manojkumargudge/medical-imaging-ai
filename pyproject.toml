@@ -1,0 +1,37 @@
+[project]
+name = "medical-imaging-ai"
+version = "0.1.0"
+description = "Medical imaging AI (AIML-02). For education only, not for clinical use."
+requires-python = ">=3.11,<3.12"
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "dvc==3.67.1",
+    "mypy==2.4.1",
+    "pytest==9.2.0",
+    "ruff==0.17.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "PD"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+strict = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
