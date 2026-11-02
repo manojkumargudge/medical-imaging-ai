@@ -15,6 +15,7 @@ env/
 !.env.example
 *.pem
 *.key
+kaggle.json
 
 # All local data (only the README and DVC pointer files are tracked)
 /data/*
@@ -22,15 +23,20 @@ env/
 !/data/.gitignore
 !/data/*.dvc
 
+data/raw/
+data/cache/
+
 # Medical image formats, wherever they end up
 *.dcm
 *.nii
 *.nii.gz
+*.npz
 
 # Generated ML artifacts
 mlruns/
 mlflow.db
 artifacts/
+checkpoints/
 /models/
 *.pkl
 *.joblib

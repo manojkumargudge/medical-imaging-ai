@@ -1,5 +1,7 @@
 # DICOM notes
 
+**Draft, not verified.**
+
 ## Structure
 
 DICOM organises imaging data in four levels:
