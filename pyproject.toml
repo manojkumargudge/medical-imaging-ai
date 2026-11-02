@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Medical imaging AI (AIML-02). For education only, not for clinical use."
 requires-python = ">=3.11,<3.12"
 readme = "README.md"
-dependencies = []
+dependencies = [
+    "numpy==2.4.6",
+    "pandas==3.1.0",
+    "pillow==13.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -21,6 +25,7 @@ include = ["src*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "PD"]
@@ -30,6 +35,11 @@ python_version = "3.11"
 files = ["src", "tests"]
 strict = true
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# No pandas-stubs: they add little here and pandas-heavy code would need many ignores.
+module = ["pandas", "pandas.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
