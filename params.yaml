@@ -1,3 +1,10 @@
 split:
   seed: 42
   val_fraction: 0.1
+preprocess:
+  image_size: 224
+  shard_size: 2000
+  # ImageNet statistics (RGB), applied by the loader after the grayscale image is copied to 3
+  # channels, because the classifier starts from ImageNet weights.
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]

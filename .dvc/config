@@ -1,0 +1,4 @@
+[core]
+    remote = drive
+['remote "drive"']
+    url = /content/drive/MyDrive/aiml02-dvc

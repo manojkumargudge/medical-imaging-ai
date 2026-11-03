@@ -2,21 +2,31 @@
 
 # Medical Imaging AI (AIML-02)
 
-Status: Step 1 data layer. NIH ChestX-ray14 metadata is split by patient, and the EDA is in
-[docs/eda.md](docs/eda.md). No images have been downloaded or preprocessed, and no model has been
-trained.
+Status: the NIH ChestX-ray14 metadata is split by patient (EDA in [docs/eda.md](docs/eda.md)).
+The preprocessing stage and the DenseNet121 classifier are written and tested on synthetic data,
+but **neither has been run on the real images yet**: no model has been trained and there are no
+results ([docs/results.md](docs/results.md)). Progress against the brief is tracked in
+[docs/brief-evidence.md](docs/brief-evidence.md).
 
 ## Layout
 
 - `src/data/split.py`: patient-level train/val/test split (standard library only)
 - `src/data/eda.py`: EDA report, written to `docs/eda.md`
-- `src/data/preprocess.py`: 224px grayscale shards with a checksum manifest (used on Colab)
-- `notebooks/colab_preprocess.ipynb`: download and resize on Colab (not run yet)
-- `dvc.yaml`, `params.yaml`: DVC pipeline (stage `split`)
+- `src/data/preprocess.py`: DVC stage `preprocess`: 224px grayscale shards with a checksum
+  manifest, plus the ImageNet mean and std for the loader
+- `src/models/`: DenseNet121 classifier: config, data and augmentation, training, metrics,
+  evaluation
+- `configs/classifier.yaml`: the fixed training config
+- `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
+  run yet)
+- `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
+- `dvc.yaml`, `params.yaml`: DVC pipeline (stages `split`, `preprocess`)
 - `tests/`: pytest tests
 - `configs/`: configuration
 - `data/`: local data, gitignored
-- `docs/`: `eda.md`, `brief-evidence.md` (requirement tracker), `dicom-notes.md`
+- `reports/`: classifier metrics JSON (after the Colab run)
+- `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `eda.md`,
+  `results.md`, `dicom-notes.md`
 
 ## Setup
 
@@ -47,9 +57,90 @@ Then build the splits and the report:
 
 - The test split is the official `test_list.txt`. Val is 10% of the `train_val_list.txt` patients,
   chosen with seed 42 (`params.yaml`). No patient is in two splits; the stage fails if one is.
-- The stage runs `python` from the path, so any Python 3.11 works; `split.py` needs no packages.
+- The `split` stage runs `python` from the path, so any Python 3.11 works; `split.py` needs no
+  packages.
 - Labels are NLP-mined from radiology reports, not radiologist-verified.
-- No DVC remote is set up, so `data/splits/` exists only where `dvc repro` has run.
+
+## Data versioning (DVC remote on Google Drive)
+
+The default DVC remote is a folder on Google Drive, `MyDrive/aiml02-dvc`, configured in
+`.dvc/config` as the Colab mount path `/content/drive/MyDrive/aiml02-dvc`.
+
+**On Colab**, `notebooks/colab_preprocess.ipynb` does the following:
+
+1. It checks free disk space on the VM and on Drive (`df -h`) and stops if either is short.
+2. It downloads the Kaggle zip (about 45 GB) to the VM and reads the images straight from it.
+   Only the three metadata files are copied out, and they are checked against `dvc.lock`.
+3. It runs `dvc repro preprocess` with `NIH_ZIP` (the zip) and `AIML02_RESUME_DIR`
+   (`MyDrive/aiml02-work/nih_224`). Shards are built in the resume folder and recorded in its
+   manifest only when complete, so a rerun after a disconnect skips finished shards.
+4. It verifies the shards and the manifest, with counts on both sides and a check that no patient
+   is in two splits, then runs `dvc push` to the Drive remote.
+5. It copies `dvc.lock` to `MyDrive/aiml02-runs/preprocess/dvc.lock.<commit>`.
+6. It deletes the zip from the VM only if you type `DELETE`, and only after the checks pass.
+
+Stage `preprocess`: deps `data/splits` and the code; params `preprocess.*` in `params.yaml`; outs
+`data/processed/nih_224/` (shards, `shards.csv`, `images.csv`, `preprocess.json`) and
+`data/manifests/nih_224.csv` (one row per image: split columns plus shard and sha256).
+
+- Images are stored as 8-bit grayscale PNG, not as normalized floats. Float32 RGB would need about
+  67 GB. The ImageNet mean and std are stage params, recorded in `preprocess.json` and applied by
+  the loader (`src/models/data.py`), after the channel is copied to RGB.
+- The zip is not a DVC dependency. Hashing 45 GB is slow, and the zip is deleted afterwards. The
+  stage instead checks that the zip has exactly the split images and records its name and size.
+- The stage command uses `$NIH_ZIP`, so it runs on Linux (Colab), not in Windows `cmd`.
+
+Then commit the `dvc.lock` from Drive (step 5), so that `dvc pull` knows the outputs:
+
+```powershell
+Copy-Item "G:\My Driveiml02-runs\preprocess\dvc.lock.<commit>" dvc.lock
+git diff dvc.lock   # only the preprocess entry should be new
+```
+
+**On the laptop**, through [Google Drive for desktop](https://www.google.com/drive/download/):
+
+1. Install it and sign in with the same Google account. `My Drive` appears as a drive letter,
+   for example `G:\My Drive`.
+2. In its settings, either choose **Mirror files**, or right-click `My Driveiml02-dvc` and choose
+   **Make available offline**. Streamed files are fetched one by one on first read, which makes
+   `dvc pull` slow.
+3. Point DVC at the local path. This goes to `.dvc/config.local`, which is not committed, so the
+   Colab path in `.dvc/config` stays as it is:
+
+   ```powershell
+   .venv\Scripts\dvc remote modify --local drive url "G:\My Driveiml02-dvc"
+   .venv\Scripts\dvc pull preprocess
+   .venv\Scripts\dvc status --cloud
+   ```
+
+`dvc push` from the laptop goes to the same folder and syncs to Drive in the background. Wait for
+Drive for desktop to finish syncing before you run the Colab notebooks.
+
+## Classifier
+
+DenseNet121 with ImageNet weights (torchvision `IMAGENET1K_V1`) and a 14-output head, one per NIH
+finding, trained with multi-label BCE. "No Finding" means all 14 targets are 0. The fixed config
+is in `configs/classifier.yaml`:
+
+- batch 64, AdamW with lr 1e-4 (weight decay 0.01), at most 5 epochs, AMP on GPU
+- one checkpoint per epoch to `MyDrive/aiml02-runs/classifier/`, never overwritten; a rerun
+  resumes after the latest one, and refuses if the config changed
+- best epoch = highest mean AUROC over the 14 labels on val
+- augmentation on the train split only: rotation up to 5 degrees, shift up to 5%, brightness and
+  contrast up to 10%. There are no flips, because left and right matter in a chest X-ray (heart
+  position). Val and test are only scaled and normalized, and a test checks this.
+
+Evaluation (`src/models/evaluate.py`) scores the best epoch on val and test and writes
+`reports/classifier_metrics.json`, `reports/classifier_thresholds.json` and `docs/results.md`:
+
+- AUROC per label, with positive and negative counts
+- one threshold per label, chosen on val only (highest F1) and applied unchanged to test
+- AUROC by sex and by age band. Ages above 100 are recording errors, so those images are counted
+  but not scored.
+
+Run `notebooks/colab_train.ipynb` on a GPU runtime. On Colab, the notebooks use Colab's own torch
+build. The versions it uses are recorded in each checkpoint and in the report, and may differ from
+the local pins.
 
 ## Checks
 
@@ -60,5 +151,6 @@ Then build the splits and the report:
 .venv\Scripts\python -m pytest
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same checks. Tests marked `real_data` skip there, because
-`data/` is not in git.
+CI (`.github/workflows/ci.yml`) runs the same checks on CPU, with torch from the PyTorch CPU
+index. Training, augmentation, evaluation and the preprocess stage are tested on tiny synthetic
+images (`tests/conftest.py`). Tests marked `real_data` skip in CI, because `data/` is not in git.

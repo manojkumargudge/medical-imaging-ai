@@ -4,9 +4,16 @@ version = "0.1.0"
 description = "Medical imaging AI (AIML-02). For education only, not for clinical use."
 requires-python = ">=3.11,<3.12"
 readme = "README.md"
+# Pinned for local Python 3.11 and CI. On Colab the notebooks use Colab's own torch build (with
+# CUDA) and record its version in the checkpoints and the report.
 dependencies = [
+    "numpy==2.4.6",
     "pandas==3.1.0",
     "pillow==13.0.0",
+    "pyyaml==6.0.3",
+    "scikit-learn==1.9.1",
+    "torch==2.15.0",
+    "torchvision==0.29.2",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +48,11 @@ warn_unreachable = true
 [[tool.mypy.overrides]]
 # No pandas-stubs: they add little here and pandas-heavy code would need many ignores.
 module = ["pandas", "pandas.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# No type information shipped (torchvision, scikit-learn) or no stubs installed (PyYAML).
+module = ["torchvision", "torchvision.*", "sklearn", "sklearn.*", "yaml"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
