@@ -88,3 +88,34 @@ def build_synthetic(root: Path, resume_dir: Path | None = None) -> Synthetic:
 @pytest.fixture(scope="session")
 def synthetic(tmp_path_factory: pytest.TempPathFactory) -> Synthetic:
     return build_synthetic(tmp_path_factory.mktemp("synthetic"))
+
+
+def make_spleen_task(
+    root: Path, cases: int = 10, shape: tuple[int, int, int] = (24, 20, 16), seed: int = 0
+) -> Path:
+    """A tiny MSD-like task folder: CT-like int16 volumes, a ball labelled 1, and dataset.json."""
+    import json
+
+    import nibabel as nib
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    task = root / "Task09_Spleen"
+    (task / "imagesTr").mkdir(parents=True)
+    (task / "labelsTr").mkdir()
+    affine = np.diag([-0.8, -0.8, 2.5, 1.0])  # RAS: x and y flipped, like many CT exports
+    grid = np.indices(shape)
+    training = []
+    for number in range(1, cases + 1):
+        centre = np.array(shape) / 2 + rng.integers(-2, 3, size=3)
+        radius = 3 + number % 3
+        ball = ((grid - centre[:, None, None, None]) ** 2).sum(axis=0) <= radius**2
+        image = rng.normal(-100, 60, size=shape)
+        image[ball] = rng.normal(120, 20, size=int(ball.sum()))  # spleen enhances on CT
+        name = f"spleen_{number}.nii.gz"
+        nib.save(nib.Nifti1Image(image.astype(np.int16), affine), task / "imagesTr" / name)
+        nib.save(nib.Nifti1Image(ball.astype(np.uint8), affine), task / "labelsTr" / name)
+        training.append({"image": f"./imagesTr/{name}", "label": f"./labelsTr/{name}"})
+    meta = {"name": "Spleen", "numTraining": cases, "training": training, "test": []}
+    (task / "dataset.json").write_text(json.dumps(meta))
+    return task

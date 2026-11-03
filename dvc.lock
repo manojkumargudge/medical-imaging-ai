@@ -31,3 +31,30 @@ stages:
       md5: ed8d7a3fd26261b678f1d6a9697ae5b2.dir
       size: 4991375
       nfiles: 3
+  seg_split:
+    cmd: python -m src.data.spleen split --task-dir data/raw/Task09_Spleen --out
+      data/seg_splits/spleen.csv --seed 42 --val-fraction 0.15 --test-fraction 
+      0.15
+    deps:
+    - path: data/raw/Task09_Spleen/dataset.json
+      hash: md5
+      md5: 91d67054fc006ad04e499e546255d0d8
+      size: 4140
+    - path: src/data/spleen.py
+      hash: md5
+      md5: 644010e426a5553704b8ea81206daefc
+      size: 12598
+    - path: src/data/split.py
+      hash: md5
+      md5: c7cea3de82c9a81c3471b8a7dcf0a048
+      size: 8838
+    params:
+      params.yaml:
+        seg_split.seed: 42
+        seg_split.test_fraction: 0.15
+        seg_split.val_fraction: 0.15
+    outs:
+    - path: data/seg_splits/spleen.csv
+      hash: md5
+      md5: aca79cd47ac36788122bb6d39443e49c
+      size: 2778

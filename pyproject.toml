@@ -8,6 +8,8 @@ readme = "README.md"
 # CUDA) and record its version in the checkpoints and the report.
 dependencies = [
     "numpy==2.4.6",
+    "monai==1.6.1",
+    "nibabel==5.4.2",
     "pandas==3.1.0",
     "pillow==13.0.0",
     "pyyaml==6.0.3",
@@ -54,6 +56,19 @@ ignore_missing_imports = true
 # No type information shipped (torchvision, scikit-learn) or no stubs installed (PyYAML).
 module = ["torchvision", "torchvision.*", "sklearn", "sklearn.*", "yaml"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# nibabel's annotations are partial (images load as FileBasedImage without shape or affine), so it
+# is treated as untyped.
+module = ["nibabel", "nibabel.*"]
+follow_imports = "skip"
+follow_untyped_imports = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# MONAI re-exports its classes from package __init__ files without __all__.
+module = ["monai", "monai.*"]
+implicit_reexport = true
 
 [[tool.mypy.overrides]]
 # dvc ships no type information; used only by a repo setup test.
