@@ -16,6 +16,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `src/data/spleen.py`: MSD Task09_Spleen download, case-level split (DVC stage `seg_split`), EDA
 - `src/data/preprocess.py`: DVC stage `preprocess`: 224px grayscale shards with a checksum
   manifest, plus the ImageNet mean and std for the loader
+- `src/dicom/convert.py`: NIH PNG -> DICOM DX and spleen NIfTI -> DICOM CT series, read back with pydicom
 - `src/models/`: DenseNet121 classifier (config, data and augmentation, training, metrics,
   evaluation), 3D U-Net segmentation (`segmentation.py`), shared checkpoint helpers
 - `configs/classifier.yaml`, `configs/segmentation.yaml`: the fixed training configs
@@ -83,6 +84,25 @@ md5. The 20 unlabelled challenge test volumes are not used.
   volumes are not tracked by DVC (public, md5-checked download), so they take no Drive space.
 - `docs/eda.md` has a spleen section (volumes, spacing, sizes, spleen volume), generated from the
   NIfTI headers and labels. Each EDA generator replaces only its own section of that file.
+
+## DICOM conversion
+
+`src/dicom/convert.py` turns the public data into DICOM for the Orthanc and viewer steps. Both
+paths read back with pydicom (`read_dx`, `read_ct_series`), and the tests compare pixels and
+geometry. What this proved is in [docs/dicom-notes.md](docs/dicom-notes.md).
+
+```powershell
+.venv\Scripts\python -m src.dicom.convert nih --png <image.png> --data-entry data/raw/Data_Entry_2017.csv --out data/dicom/nih/<image>.dcm
+.venv\Scripts\python -m src.dicom.convert spleen --nifti data/raw/Task09_Spleen/imagesTr/spleen_2.nii.gz --out data/dicom/spleen_2
+```
+
+- NIH PNG -> DX (For Presentation), MONOCHROME2, 8 bits. PatientID is the NIH patient ID;
+  PixelSpacing is computed from the original spacing and the resize to 1024. No names or dates.
+- MSD NIfTI -> CT series, one file per slice, HU with rescale tags. ImagePositionPatient,
+  ImageOrientationPatient, PixelSpacing and SliceThickness are computed from the affine (RAS -> LPS).
+- UIDs are new, under pydicom's root, and derived from the source name. Reconverting the same file
+  gives the same UIDs.
+- Existing files are never overwritten. `data/dicom/` is gitignored, like all data (`*.dcm`).
 
 ## Data versioning (DVC remote on Google Drive)
 
