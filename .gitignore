@@ -15,22 +15,32 @@ env/
 !.env.example
 *.pem
 *.key
+kaggle.json
 
-# All local data (only the README and DVC pointer files are tracked)
-/data/*
-!/data/README.md
-!/data/.gitignore
-!/data/*.dvc
+# All local data (only the README and DVC pointer files are tracked).
+# Do not use /data/* or /data/*/ here: DVC then stops seeing data/*.dvc, and `dvc push` says
+# "Everything is up to date" without pushing anything (tests/test_repo_setup.py checks this).
+/data/manifests/
+/data/processed/
+/data/splits/
+data/raw/
+data/cache/
+/data/**/*.csv
+/data/**/*.txt
+/data/**/*.zip
+/data/**/*.png
 
 # Medical image formats, wherever they end up
 *.dcm
 *.nii
 *.nii.gz
+*.npz
 
 # Generated ML artifacts
 mlruns/
 mlflow.db
 artifacts/
+checkpoints/
 /models/
 *.pkl
 *.joblib

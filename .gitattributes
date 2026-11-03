@@ -1,0 +1,2 @@
+# LF everywhere, so DVC's md5 of src/data/split.py (a stage dependency) is the same on every OS.
+* text=auto eol=lf

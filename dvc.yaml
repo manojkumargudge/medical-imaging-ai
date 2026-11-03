@@ -1,0 +1,21 @@
+stages:
+  split:
+    # Standard library only: any Python 3.11 named `python` on the path can run it.
+    cmd: >-
+      python -m src.data.split
+      --data-entry data/raw/Data_Entry_2017.csv
+      --train-val-list data/raw/train_val_list.txt
+      --test-list data/raw/test_list.txt
+      --out-dir data/splits
+      --seed ${split.seed}
+      --val-fraction ${split.val_fraction}
+    deps:
+      - data/raw/Data_Entry_2017.csv
+      - data/raw/train_val_list.txt
+      - data/raw/test_list.txt
+      - src/data/split.py
+    params:
+      - split.seed
+      - split.val_fraction
+    outs:
+      - data/splits

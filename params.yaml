@@ -1,0 +1,3 @@
+split:
+  seed: 42
+  val_fraction: 0.1
