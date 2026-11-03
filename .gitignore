@@ -23,6 +23,7 @@ kaggle.json
 /data/manifests/
 /data/processed/
 /data/splits/
+/data/seg_splits/
 data/raw/
 data/cache/
 /data/**/*.csv

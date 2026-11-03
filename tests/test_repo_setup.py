@@ -21,7 +21,7 @@ def test_dvc_sees_the_split_and_preprocess_stages() -> None:
     # Catches .gitignore patterns that hide dvc.yaml or data pointers from DVC.
     with Repo(str(REPO_ROOT)) as repo:
         stages = {stage.addressing: stage for stage in repo.index.stages}
-    assert {"split", "preprocess"} <= set(stages)
+    assert {"split", "preprocess", "seg_split"} <= set(stages)
     preprocess = stages["preprocess"]
     deps = {Path(str(dep.def_path)).as_posix() for dep in preprocess.deps}
     outs = {Path(str(out.def_path)).as_posix() for out in preprocess.outs}

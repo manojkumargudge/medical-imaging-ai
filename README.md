@@ -12,6 +12,7 @@ results ([docs/results.md](docs/results.md)). Progress against the brief is trac
 
 - `src/data/split.py`: patient-level train/val/test split (standard library only)
 - `src/data/eda.py`: EDA report, written to `docs/eda.md`
+- `src/data/spleen.py`: MSD Task09_Spleen download, case-level split (DVC stage `seg_split`), EDA
 - `src/data/preprocess.py`: DVC stage `preprocess`: 224px grayscale shards with a checksum
   manifest, plus the ImageNet mean and std for the loader
 - `src/models/`: DenseNet121 classifier: config, data and augmentation, training, metrics,
@@ -20,7 +21,7 @@ results ([docs/results.md](docs/results.md)). Progress against the brief is trac
 - `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
   run yet)
 - `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
-- `dvc.yaml`, `params.yaml`: DVC pipeline (stages `split`, `preprocess`)
+- `dvc.yaml`, `params.yaml`: DVC pipeline (stages `split`, `preprocess`, `seg_split`)
 - `tests/`: pytest tests
 - `configs/`: configuration
 - `data/`: local data, gitignored
@@ -60,6 +61,26 @@ Then build the splits and the report:
 - The `split` stage runs `python` from the path, so any Python 3.11 works; `split.py` needs no
   packages.
 - Labels are NLP-mined from radiology reports, not radiologist-verified.
+
+## Segmentation data (MSD Task09_Spleen)
+
+Medical Segmentation Decathlon Task09: 41 labelled portal-venous CT volumes (NIfTI), label 1 =
+spleen. Source: the copy MONAI downloads (`msd-for-monai` on S3, CC-BY-SA 4.0), checked against its
+md5. The 20 unlabelled challenge test volumes are not used.
+
+```powershell
+.venv\Scripts\python -m src.data.spleen download --root data/raw   # about 1.5 GB, md5 checked
+.venv\Scripts\dvc repro seg_split
+.venv\Scripts\python -m src.data.spleen eda --task-dir data/raw/Task09_Spleen --split data/seg_splits/spleen.csv --out docs/eda.md
+```
+
+- DVC stage `seg_split`: the labelled cases are split by case into 29 train, 6 val and 6 test (seed
+  42; `params.yaml`). The stage prints the counts and fails if a case, image or label file is in two
+  splits. MSD gives no patient IDs, so one case is treated as one patient.
+- Only `dataset.json` is a dependency: the split depends on the case list, not on the volumes. The
+  volumes are not tracked by DVC (public, md5-checked download), so they take no Drive space.
+- `docs/eda.md` has a spleen section (volumes, spacing, sizes, spleen volume), generated from the
+  NIfTI headers and labels. Each EDA generator replaces only its own section of that file.
 
 ## Data versioning (DVC remote on Google Drive)
 

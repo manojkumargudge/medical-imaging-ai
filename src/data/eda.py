@@ -1,6 +1,6 @@
 """EDA of the NIH ChestX-ray14 splits, written as a Markdown report.
 
-Run: python -m src.data.eda --splits-dir data/splits --out docs/eda.md
+Run: python -m src.data.eda --splits-dir data/splits --out docs/eda.md (replaces the NIH section)
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.data.report import write_section
 from src.data.split import COLUMNS, SPLITS
 
 FINDINGS = (
@@ -256,9 +257,9 @@ def main() -> None:
 
     frame = load_splits(args.splits_dir)
     print(f"loaded {len(frame)} rows, {frame['patient'].nunique()} patients")
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(render_report(frame), encoding="utf-8")
-    print(f"wrote {args.out}")
+    # Only the NIH block is replaced; the spleen section (src/data/spleen.py) is kept.
+    write_section(args.out, "nih", render_report(frame))
+    print(f"wrote the NIH section of {args.out}")
 
 
 if __name__ == "__main__":

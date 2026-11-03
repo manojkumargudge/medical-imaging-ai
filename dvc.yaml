@@ -45,3 +45,23 @@ stages:
     outs:
       - data/processed/nih_224
       - data/manifests/nih_224.csv
+  seg_split:
+    # MSD Task09_Spleen, labelled cases only. Only dataset.json is a dep: the split depends on the
+    # case list, not on the 1.5 GB of volumes (downloaded with an md5 check, not tracked by DVC).
+    cmd: >-
+      python -m src.data.spleen split
+      --task-dir data/raw/Task09_Spleen
+      --out data/seg_splits/spleen.csv
+      --seed ${seg_split.seed}
+      --val-fraction ${seg_split.val_fraction}
+      --test-fraction ${seg_split.test_fraction}
+    deps:
+      - data/raw/Task09_Spleen/dataset.json
+      - src/data/spleen.py
+      - src/data/split.py
+    params:
+      - seg_split.seed
+      - seg_split.val_fraction
+      - seg_split.test_fraction
+    outs:
+      - data/seg_splits/spleen.csv

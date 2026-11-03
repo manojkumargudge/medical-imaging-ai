@@ -8,3 +8,8 @@ preprocess:
   # channels, because the classifier starts from ImageNet weights.
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
+seg_split:
+  # 41 labelled cases: round(41 * 0.15) = 6 val and 6 test, 29 train.
+  seed: 42
+  val_fraction: 0.15
+  test_fraction: 0.15
