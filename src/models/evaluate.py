@@ -25,6 +25,7 @@ import torch
 import torchvision
 from torch.utils.data import DataLoader
 
+from src.models.checkpoints import checkpoint_path, latest_checkpoint, load_checkpoint
 from src.models.classifier import build_model
 from src.models.config import ClassifierConfig, load_config
 from src.models.data import Sample, ShardDataset, make_datasets
@@ -38,7 +39,7 @@ from src.models.metrics import (
     subgroup_aurocs,
     threshold_metrics,
 )
-from src.models.train import best_epoch, checkpoint_path, latest_checkpoint, load_checkpoint
+from src.models.train import best_epoch
 from src.models.train import predict as predict_loader
 
 DATASET = "NIH ChestX-ray14 (Kaggle nih-chest-xrays/data)"

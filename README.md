@@ -2,10 +2,11 @@
 
 # Medical Imaging AI (AIML-02)
 
-Status: the NIH ChestX-ray14 metadata is split by patient (EDA in [docs/eda.md](docs/eda.md)).
-The preprocessing stage and the DenseNet121 classifier are written and tested on synthetic data,
-but **neither has been run on the real images yet**: no model has been trained and there are no
-results ([docs/results.md](docs/results.md)). Progress against the brief is tracked in
+Status: the NIH ChestX-ray14 metadata is split by patient, and the 41 labelled MSD Task09_Spleen
+CT volumes are split by case (EDA of both in [docs/eda.md](docs/eda.md)). The NIH preprocessing
+stage, the DenseNet121 classifier and the 3D U-Net are written and tested on synthetic data, but
+**none has been run on real images yet**: no model has been trained and there are no results
+([docs/results.md](docs/results.md)). Progress against the brief is tracked in
 [docs/brief-evidence.md](docs/brief-evidence.md).
 
 ## Layout
@@ -15,12 +16,13 @@ results ([docs/results.md](docs/results.md)). Progress against the brief is trac
 - `src/data/spleen.py`: MSD Task09_Spleen download, case-level split (DVC stage `seg_split`), EDA
 - `src/data/preprocess.py`: DVC stage `preprocess`: 224px grayscale shards with a checksum
   manifest, plus the ImageNet mean and std for the loader
-- `src/models/`: DenseNet121 classifier: config, data and augmentation, training, metrics,
-  evaluation
-- `configs/classifier.yaml`: the fixed training config
+- `src/models/`: DenseNet121 classifier (config, data and augmentation, training, metrics,
+  evaluation), 3D U-Net segmentation (`segmentation.py`), shared checkpoint helpers
+- `configs/classifier.yaml`, `configs/segmentation.yaml`: the fixed training configs
 - `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
   run yet)
 - `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
+- `notebooks/colab_seg.ipynb`: 3D U-Net training and evaluation on a Colab GPU (not run yet)
 - `dvc.yaml`, `params.yaml`: DVC pipeline (stages `split`, `preprocess`, `seg_split`)
 - `tests/`: pytest tests
 - `configs/`: configuration
@@ -153,8 +155,10 @@ there. It asserts that the data path is not under `/content/drive`.
 | DVC remote: NIH 224px shards and manifests | `aiml02-dvc/` | about 4 to 6 GB (estimate: 112,120 PNGs at 35 to 50 KB; not measured yet) |
 | DVC remote: split CSVs | `aiml02-dvc/` | 5 MB (measured locally) |
 | Classifier checkpoints, 5 epochs | `aiml02-runs/classifier/` | 5 × 84.5 MB = 0.42 GB (measured: DenseNet121 weights + AdamW state) |
+| Segmentation checkpoints, every 10 of 200 epochs | `aiml02-runs/segmentation/` | 20 × 57.9 MB = 1.16 GB (measured: 3D UNet weights + Adam state) |
+| MSD Task09_Spleen volumes | not on Drive | 0 (downloaded to the VM disk, md5 checked) |
 | Reports and `dvc.lock` copies | `aiml02-runs/` | under 1 MB |
-| **Total** | | **about 4.5 to 6.5 GB** |
+| **Total** | | **about 5.7 to 7.7 GB** |
 
 The previous layout also kept a resume copy of the shards on Drive, about 12 GB in total. The
 preprocess notebook stops if Drive has less than about 7 GB free (6 GB of shards plus 1 GB margin,
@@ -185,6 +189,30 @@ Evaluation (`src/models/evaluate.py`) scores the best epoch on val and test and 
 Run `notebooks/colab_train.ipynb` on a GPU runtime. On Colab, the notebooks use Colab's own torch
 build. The versions it uses are recorded in each checkpoint and in the report, and may differ from
 the local pins.
+
+## Segmentation model (3D U-Net)
+
+MONAI `UNet` with `spatial_dims=3`, channels 16-32-64-128-256, residual units, batch norm, 2
+output channels (background, spleen). The fixed config is in `configs/segmentation.yaml`; the code is
+`src/models/segmentation.py`.
+
+- Preprocessing (every split): reorient to RAS, resample to 1.5 mm isotropic, CT window -57 to
+  164 HU mapped to [0, 1] and clipped, crop to the body.
+- Train split only: four random 96^3 crops per volume (half centred on spleen), then light
+  augmentation: a small random affine (rotation up to 10 degrees, scaling up to 10%, probability
+  0.2) and an intensity shift of up to 0.1. There are no flips, because the spleen is on the left.
+  A test checks that val and test get no random transform.
+- Dice + cross-entropy loss, Adam with lr 1e-4, batch 2 volumes (8 crops), at most 200 epochs, AMP
+  on GPU.
+- Every 10 epochs: sliding-window inference over each whole val volume (96^3 windows, overlap
+  0.25), spleen Dice per case, and a checkpoint to `MyDrive/aiml02-runs/segmentation/`. Checkpoints
+  are never overwritten; a rerun resumes after the latest one, and refuses if the config changed.
+  The best checkpoint has the highest val mean Dice.
+- `python -m src.models.segmentation evaluate` scores the best checkpoint on val and test (Dice
+  per case) and writes `reports/segmentation_metrics.json`.
+
+Run `notebooks/colab_seg.ipynb` on a GPU runtime. It downloads the data to the VM disk, rebuilds
+`seg_split` and stops if `dvc.lock` changes, then trains and evaluates.
 
 ## Checks
 

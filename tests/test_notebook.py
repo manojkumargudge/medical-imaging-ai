@@ -7,6 +7,7 @@ import pytest
 NOTEBOOKS = Path(__file__).resolve().parents[1] / "notebooks"
 PREPROCESS = NOTEBOOKS / "colab_preprocess.ipynb"
 TRAIN = NOTEBOOKS / "colab_train.ipynb"
+SEG = NOTEBOOKS / "colab_seg.ipynb"
 
 
 def code_cells(path: Path) -> list[dict[str, Any]]:
@@ -23,7 +24,7 @@ def position(cells: list[str], text: str) -> int:
     return next(index for index, source in enumerate(cells) if text in source)
 
 
-@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN, SEG])
 def test_code_cells_compile(path: Path) -> None:
     cells = sources(path)
     assert cells
@@ -31,14 +32,14 @@ def test_code_cells_compile(path: Path) -> None:
         compile(source, f"{path.name} cell {number}", "exec")
 
 
-@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN, SEG])
 def test_notebook_has_not_been_run(path: Path) -> None:
     cells = code_cells(path)
     assert cells
     assert all(not cell["outputs"] and cell["execution_count"] is None for cell in cells)
 
 
-@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN, SEG])
 def test_disk_is_checked_in_the_first_code_cell(path: Path) -> None:
     first = sources(path)[0]
     assert 'run("df", "-h"' in first
@@ -65,7 +66,7 @@ def test_stage_builds_on_the_vm_disk_and_resumes_from_the_manifest() -> None:
     assert 'run("dvc", "repro", "preprocess"' in source
 
 
-@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN, SEG])
 def test_drive_paths_are_only_the_remote_runs_and_checks(path: Path) -> None:
     source = "\n".join(sources(path))
     drive_lines = [line for line in source.splitlines() if "/content/drive" in line]
@@ -82,7 +83,7 @@ def test_drive_paths_are_only_the_remote_runs_and_checks(path: Path) -> None:
     assert all(any(token in line for token in allowed) for line in drive_lines), drive_lines
 
 
-@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN, SEG])
 def test_nothing_is_deleted_on_drive(path: Path) -> None:
     source = "\n".join(sources(path))
     assert "rmtree" not in source and "os.remove" not in source
@@ -120,3 +121,13 @@ def test_train_notebook_uses_the_fixed_config_and_resumes() -> None:
     assert "train.train(config)" in source
     assert "evaluate.evaluate(config" in source
     assert "torch.cuda.is_available()" in source
+
+
+def test_seg_notebook_downloads_to_the_vm_and_checks_the_split() -> None:
+    source = "\n".join(sources(SEG))
+    assert 'spleen.download(REPO / "data" / "raw")' in source
+    assert 'check_off_drive(REPO / config.task_dir, "task_dir")' in source
+    assert 'run("dvc", "repro", "seg_split"' in source
+    assert '"git", "diff", "--quiet", "dvc.lock"' in source
+    assert source.index('"seg_split"') < source.index("train_segmentation(config)")
+    assert "evaluate_segmentation(config)" in source

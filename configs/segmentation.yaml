@@ -1,0 +1,49 @@
+# Spleen segmentation, MSD Task09 (AIML-02). For education only, not for clinical use.
+# Fixed config: src/models/segmentation.py rejects anything it does not support.
+
+data:
+  task_dir: data/raw/Task09_Spleen # downloaded with an md5 check (src/data/spleen.py)
+  split: data/seg_splits/spleen.csv # DVC stage seg_split
+  cache_rate: 1.0 # cache the deterministic transforms of every volume in RAM (about 3 GB)
+  num_workers: 2
+
+model: # MONAI UNet
+  spatial_dims: 3
+  channels: [16, 32, 64, 128, 256]
+  strides: [2, 2, 2, 2]
+  num_res_units: 2
+  norm: batch
+
+preprocess:
+  pixdim: [1.5, 1.5, 1.5] # mm, after reorienting to RAS
+  # Soft-tissue CT window in HU, mapped to [0, 1] and clipped (as in the MONAI spleen tutorial).
+  hu_window: [-57, 164]
+  roi_size: [96, 96, 96]
+
+# Train split only. Light: no flips (the spleen is on the left; flipping changes the anatomy).
+augment:
+  samples_per_volume: 4 # random 96^3 crops per volume and step
+  positive_fraction: 0.5 # crops centred on spleen vs on background
+  affine_prob: 0.2
+  rotate_degrees: 10
+  scale: 0.1
+  intensity_shift: 0.1
+  intensity_prob: 0.5
+
+train:
+  loss: dice_ce # Dice + cross-entropy, softmax over background and spleen
+  batch_size: 2 # volumes per step, so 8 crops
+  optimizer: adam
+  lr: 1.0e-4
+  max_epochs: 200
+  val_interval: 10 # sliding-window val Dice and a checkpoint every 10 epochs
+  amp: true # used only on a CUDA GPU
+  seed: 42
+  selection_metric: val_mean_dice # best checkpoint = highest mean Dice (spleen) over val cases
+  # One checkpoint per val epoch (about 58 MB each, 20 in all), never overwritten; a rerun resumes
+  # from the latest one.
+  checkpoint_dir: /content/drive/MyDrive/aiml02-runs/segmentation
+
+inference:
+  sw_batch_size: 4
+  overlap: 0.25

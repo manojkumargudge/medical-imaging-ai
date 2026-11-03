@@ -12,10 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
 import time
-import uuid
 from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from pathlib import Path
@@ -27,6 +24,14 @@ import torchvision
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
+from src.models.checkpoints import best_epoch as _best_epoch
+from src.models.checkpoints import (
+    checkpoint_path,
+    latest_checkpoint,
+    load_checkpoint,
+    save_new,
+    write_text,
+)
 from src.models.classifier import build_loss, build_model
 from src.models.config import ClassifierConfig, load_config
 from src.models.data import make_datasets
@@ -34,50 +39,15 @@ from src.models.metrics import Array, label_aurocs, mean_auroc
 
 Batch = tuple[torch.Tensor, torch.Tensor]
 Log = Callable[[str], None]
-_CHECKPOINT = re.compile(r"^epoch_(\d{3})\.pt$")
-
-
-def select_device() -> torch.device:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def checkpoint_path(checkpoint_dir: Path, epoch: int) -> Path:
-    return checkpoint_dir / f"epoch_{epoch:03d}.pt"
-
-
-def latest_checkpoint(checkpoint_dir: Path) -> Path | None:
-    found = sorted(
-        path for path in checkpoint_dir.glob("epoch_*.pt") if _CHECKPOINT.match(path.name)
-    )
-    return found[-1] if found else None
-
-
-def load_checkpoint(path: Path) -> dict[str, Any]:
-    checkpoint: dict[str, Any] = torch.load(path, map_location="cpu", weights_only=True)
-    return checkpoint
 
 
 def best_epoch(history: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """The epoch with the highest val mean AUROC; the earliest one on a tie."""
-    scored = [entry for entry in history if entry["val_mean_auroc"] is not None]
-    if not scored:
-        raise ValueError("no epoch has a val mean AUROC")
-    return dict(max(scored, key=lambda entry: (entry["val_mean_auroc"], -entry["epoch"])))
+    return _best_epoch(history, "val_mean_auroc")
 
 
-def _save_new(path: Path, write: Callable[[Path], object]) -> None:
-    """Write to a unique temporary name, then rename; refuses to replace an existing file."""
-    if path.exists():
-        raise FileExistsError(f"{path} exists; not overwriting")
-    temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.partial")
-    write(temporary)
-    if path.exists():
-        raise FileExistsError(f"{path} appeared while saving; {temporary} kept")
-    os.replace(temporary, path)
-
-
-def _write_text(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8", newline="\n")
+def select_device() -> torch.device:
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def predict(
@@ -197,9 +167,9 @@ def train(
             },
         }
         path = checkpoint_path(config.checkpoint_dir, epoch)
-        _save_new(path, partial(torch.save, state))
+        save_new(path, partial(torch.save, state))
         summary = json.dumps(entry, indent=2) + "\n"
-        _save_new(path.with_suffix(".json"), partial(_write_text, text=summary))
+        save_new(path.with_suffix(".json"), partial(write_text, text=summary))
         mean = entry["val_mean_auroc"]
         log(
             f"epoch {epoch}: train loss {entry['train_loss']:.4f}, val mean AUROC "

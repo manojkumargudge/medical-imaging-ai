@@ -10,6 +10,7 @@ from conftest import Synthetic
 
 from src.data.eda import FINDINGS
 from src.models import evaluate, train
+from src.models.checkpoints import load_checkpoint, save_new
 from src.models.classifier import build_loss, build_model
 from src.models.config import ClassifierConfig, load_config
 from src.models.data import make_datasets, read_manifest
@@ -99,7 +100,7 @@ def test_training_checkpoints_every_epoch_and_resumes(synthetic: Synthetic, tmp_
         "epoch_002.json",
         "epoch_002.pt",
     ]
-    state = train.load_checkpoint(checkpoints / "epoch_002.pt")
+    state = load_checkpoint(checkpoints / "epoch_002.pt")
     assert state["epoch"] == 2 and state["fingerprint"] == config.fingerprint()
     assert set(state) >= {"model", "optimizer", "scaler", "history", "config"}
 
@@ -130,7 +131,7 @@ def test_existing_checkpoint_is_never_overwritten(tmp_path: Path) -> None:
     path = tmp_path / "epoch_001.pt"
     path.write_bytes(b"keep")
     with pytest.raises(FileExistsError):
-        train._save_new(path, lambda target: target.write_bytes(b"new"))
+        save_new(path, lambda target: target.write_bytes(b"new"))
     assert path.read_bytes() == b"keep"
 
 
