@@ -19,3 +19,28 @@ stages:
       - split.val_fraction
     outs:
       - data/splits
+  preprocess:
+    # Runs on Colab (Linux): the shell expands $NIH_ZIP (the Kaggle zip, about 45 GB, not a dep
+    # because hashing it is slow and it is deleted afterwards) and $AIML02_RESUME_DIR (a Drive
+    # folder that survives a disconnect; empty = build straight into the output folder).
+    cmd: >-
+      python -m src.data.preprocess
+      --zip "$NIH_ZIP"
+      --splits-dir data/splits
+      --out-dir data/processed/nih_224
+      --manifest data/manifests/nih_224.csv
+      --work-dir data/cache/preprocess
+      --resume-dir "$AIML02_RESUME_DIR"
+      --params params.yaml
+    deps:
+      - data/splits
+      - src/data/preprocess.py
+      - src/data/split.py
+    params:
+      - preprocess.image_size
+      - preprocess.shard_size
+      - preprocess.mean
+      - preprocess.std
+    outs:
+      - data/processed/nih_224
+      - data/manifests/nih_224.csv

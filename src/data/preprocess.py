@@ -1,27 +1,43 @@
 """Resize images to 224px grayscale PNG and store them in zip shards with a checksum manifest.
 
-Used by notebooks/colab_preprocess.ipynb. Resumable: a shard is recorded in the manifest only after
-it is complete in the output folder, and a rerun skips recorded shards after checking their sha256.
+DVC stage `preprocess`, run on Colab by notebooks/colab_preprocess.ipynb. Resumable: a shard is
+recorded in the manifest only after it is complete in the output folder, and a rerun skips recorded
+shards after checking their sha256.
+
+Pixels are stored as 8-bit grayscale, not as normalized floats: float32 RGB tensors would need about
+67 GB instead of a few GB. The ImageNet mean and std are stage parameters, written to
+`preprocess.json` next to the shards, and the training loader applies them (src/models/data.py).
+
+Run: NIH_ZIP=/content/raw/data.zip dvc repro preprocess
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import io
+import json
 import os
 import shutil
 import zipfile
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from pathlib import Path, PurePosixPath
+from typing import Any
 
+import yaml
 from PIL import Image
+
+from src.data import split
 
 IMAGE_SIZE = 224
 SHARD_SIZE = 2_000
 SHARDS_MANIFEST = "shards.csv"
 IMAGES_MANIFEST = "images.csv"
+PREPROCESS_INFO = "preprocess.json"
+# The training manifest: one row per image, with the split columns plus where the image is stored.
+MANIFEST_COLUMNS = (*split.COLUMNS, "split", "shard", "sha256")
 
 _ALLOWED_MODES = {"L", "RGB", "RGBA"}
 # Fixed timestamp, so the same images always give the same shard bytes and sha256.
@@ -260,3 +276,159 @@ class ZipImages:
 
     def close(self) -> None:
         self._zip.close()
+
+
+def read_params(path: Path) -> dict[str, Any]:
+    """The `preprocess` section of params.yaml, checked."""
+    params = yaml.safe_load(path.read_text(encoding="utf-8"))["preprocess"]
+    for key in ("mean", "std"):
+        values = params[key]
+        if len(values) != 3 or not all(isinstance(value, float) for value in values):
+            raise ValueError(f"preprocess.{key} must be three floats, got {values!r}")
+    if not all(value > 0 for value in params["std"]):
+        raise ValueError("preprocess.std must be positive")
+    return {
+        "image_size": int(params["image_size"]),
+        "shard_size": int(params["shard_size"]),
+        "mean": [float(value) for value in params["mean"]],
+        "std": [float(value) for value in params["std"]],
+    }
+
+
+def _write_new_text(path: Path, text: str) -> None:
+    """Write a file; an existing one is accepted only if identical, never replaced."""
+    if path.exists():
+        if path.read_text(encoding="utf-8") != text:
+            raise ValueError(f"{path} exists with other content; not overwriting")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".partial")
+    partial.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(partial, path)
+
+
+def copy_shards(source: Path, target: Path) -> Report:
+    """Copy verified shards and their manifests into an empty folder, then verify the copy."""
+    verified = verify_shards(source)
+    if target.exists() and any(target.iterdir()):
+        raise ValueError(f"{target} is not empty; not overwriting")
+    target.mkdir(parents=True, exist_ok=True)
+    shards = [record.shard for record in _read_shard_records(source / SHARDS_MANIFEST)]
+    for name in (*shards, SHARDS_MANIFEST, IMAGES_MANIFEST):
+        partial = target / f"{name}.partial"
+        shutil.copyfile(source / name, partial)
+        os.replace(partial, target / name)
+    copied = verify_shards(target)
+    print(f"copied {source} -> {target}: {verified.images} -> {copied.images} images")
+    if not (verified.images > 0 and copied.images == verified.images):
+        raise ValueError(f"copy has {copied.images} images, {verified.images} expected")
+    return copied
+
+
+def build_manifest(splits: split.Splits, images_manifest: Path) -> list[tuple[object, ...]]:
+    """Join the split rows with the shard of each image; fails on any image without a shard."""
+    stored = {record.image: record for record in _read_image_records(images_manifest)}
+    rows: list[tuple[object, ...]] = []
+    for name in split.SPLITS:
+        for entry in splits[name]:
+            record = stored.get(entry.image)
+            if record is None:
+                raise ValueError(f"{entry.image} ({name}) is not in {images_manifest}")
+            rows.append((*astuple(entry), name, record.shard, record.sha256))
+    print(f"manifest rows {len(rows)}, stored images {len(stored)}")
+    if not rows or len(rows) != len(stored):
+        raise ValueError(f"{len(rows)} split rows but {len(stored)} stored images")
+    return rows
+
+
+def run_stage(
+    zip_path: Path,
+    splits_dir: Path,
+    out_dir: Path,
+    manifest_path: Path,
+    work_dir: Path,
+    params: dict[str, Any],
+    resume_dir: Path | None = None,
+) -> Report:
+    """Resize every split image from the dataset zip into verified shards plus a manifest.
+
+    With resume_dir (a Drive folder on Colab), the shards are built there, so a disconnect loses at
+    most one shard, and are copied into out_dir once complete and verified.
+    """
+    splits = split.read_splits(splits_dir)
+    split.check_patient_level(splits)
+    wanted = sorted(entry.image for name in split.SPLITS for entry in splits[name])
+
+    images = ZipImages(zip_path)
+    try:
+        in_zip = set(images.names)
+        print(f"images in zip {len(in_zip)}, images in splits {len(wanted)}")
+        if not in_zip or not wanted:
+            raise ValueError("no images in the zip or the splits")
+        missing = sorted(set(wanted) - in_zip)
+        if missing:
+            raise ValueError(f"{len(missing)} split images are not in the zip, e.g. {missing[:3]}")
+        if len(in_zip) != len(wanted):
+            raise ValueError(f"the zip has {len(in_zip) - len(wanted)} images that are in no split")
+        build_dir = resume_dir if resume_dir is not None else out_dir
+        write_shards(
+            wanted,
+            images.read,
+            build_dir,
+            work_dir,
+            size=params["image_size"],
+            shard_size=params["shard_size"],
+        )
+    finally:
+        images.close()
+
+    report = copy_shards(build_dir, out_dir) if resume_dir is not None else verify_shards(out_dir)
+    rows = build_manifest(splits, out_dir / IMAGES_MANIFEST)
+    lines = io.StringIO()
+    writer = csv.writer(lines, lineterminator="\n")
+    writer.writerow(MANIFEST_COLUMNS)
+    writer.writerows(rows)
+    _write_new_text(manifest_path, lines.getvalue())
+
+    info = {
+        "image_size": params["image_size"],
+        "stored_as": "8-bit grayscale PNG; scale to [0, 1], copy to 3 channels, then normalize",
+        "mean": params["mean"],
+        "std": params["std"],
+        "images": report.images,
+        "shards": report.shards,
+        "source_zip": zip_path.name,
+        "source_zip_bytes": zip_path.stat().st_size,
+    }
+    _write_new_text(out_dir / PREPROCESS_INFO, json.dumps(info, indent=2) + "\n")
+    print(f"{report.images} images in {report.shards} shards, {report.total_bytes / 1e9:.2f} GB")
+    return report
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--zip", required=True, help="dataset zip ($NIH_ZIP in dvc.yaml)")
+    parser.add_argument("--splits-dir", type=Path, required=True)
+    parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--work-dir", type=Path, required=True)
+    parser.add_argument("--params", type=Path, default=Path("params.yaml"))
+    parser.add_argument(
+        "--resume-dir", default="", help="optional build folder that survives a disconnect"
+    )
+    args = parser.parse_args()
+    if not args.zip:
+        parser.error("--zip is empty: set NIH_ZIP to the dataset zip")
+    run_stage(
+        Path(args.zip),
+        args.splits_dir,
+        args.out_dir,
+        args.manifest,
+        args.work_dir,
+        read_params(args.params),
+        resume_dir=Path(args.resume_dir) if args.resume_dir else None,
+    )
+
+
+if __name__ == "__main__":
+    main()

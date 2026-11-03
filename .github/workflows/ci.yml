@@ -16,6 +16,10 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install
+        # CPU-only torch: the pins match the +cpu builds on this index, and the CUDA builds on
+        # PyPI would add gigabytes of downloads that the CPU tests do not need.
+        env:
+          PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
         run: python -m pip install -e ".[dev]"
       - name: Lint
         run: |
