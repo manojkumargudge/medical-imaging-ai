@@ -1,0 +1,33 @@
+schema: '2.0'
+stages:
+  split:
+    cmd: python -m src.data.split --data-entry data/raw/Data_Entry_2017.csv 
+      --train-val-list data/raw/train_val_list.txt --test-list 
+      data/raw/test_list.txt --out-dir data/splits --seed 42 --val-fraction 0.1
+    deps:
+    - path: data/raw/Data_Entry_2017.csv
+      hash: md5
+      md5: 2528009b0d96b19d4de60debedd8ded6
+      size: 7861152
+    - path: data/raw/test_list.txt
+      hash: md5
+      md5: adeeabf20ea2a8eb66ced87b78434400
+      size: 435131
+    - path: data/raw/train_val_list.txt
+      hash: md5
+      md5: 067e3a84206964892e6300e4a4c0a205
+      size: 1470907
+    - path: src/data/split.py
+      hash: md5
+      md5: c7cea3de82c9a81c3471b8a7dcf0a048
+      size: 8838
+    params:
+      params.yaml:
+        split.seed: 42
+        split.val_fraction: 0.1
+    outs:
+    - path: data/splits
+      hash: md5
+      md5: ed8d7a3fd26261b678f1d6a9697ae5b2.dir
+      size: 4991375
+      nfiles: 3
