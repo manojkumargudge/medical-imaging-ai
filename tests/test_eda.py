@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from src.data import eda, split
+from src.data.report import read_section, write_section
 
 FIXTURES = Path(__file__).parent / "fixtures" / "nih"
 
@@ -114,4 +115,11 @@ def test_cli_writes_report(
     out = tmp_path / "docs" / "eda.md"
     monkeypatch.setattr("sys.argv", ["eda", "--splits-dir", str(splits_dir), "--out", str(out)])
     eda.main()
-    assert out.read_text(encoding="utf-8").startswith("# NIH ChestX-ray14")
+    section = read_section(out, "nih")
+    assert section is not None and section.startswith("# NIH ChestX-ray14")
+
+    # A rerun replaces only the NIH section and keeps the spleen section.
+    write_section(out, "spleen", "# Spleen\n")
+    eda.main()
+    assert read_section(out, "spleen") == "# Spleen\n"
+    assert out.read_text(encoding="utf-8").count("# NIH ChestX-ray14") == 1
