@@ -49,9 +49,9 @@ def test_preprocess_info_records_size_and_imagenet_stats(synthetic: Synthetic) -
 
 
 def test_resume_dir_gives_the_same_outputs(synthetic: Synthetic, tmp_path: Path) -> None:
-    resume = tmp_path / "drive"
+    resume = tmp_path / "vm-resume"
     other = build_synthetic(tmp_path / "run", resume_dir=resume)
-    assert preprocess.verify_shards(resume).images > 0
+    assert preprocess.verify_shards(resume / "32px-5").images > 0
     assert other.manifest.read_text() == synthetic.manifest.read_text()
     for name in ("shards.csv", "images.csv", preprocess.PREPROCESS_INFO):
         assert (other.processed_dir / name).read_text() == (
@@ -60,11 +60,11 @@ def test_resume_dir_gives_the_same_outputs(synthetic: Synthetic, tmp_path: Path)
 
 
 def test_resume_dir_skips_finished_shards(tmp_path: Path) -> None:
-    resume = tmp_path / "drive"
+    resume = tmp_path / "vm-resume"
     build_synthetic(tmp_path / "first", resume_dir=resume)
-    before = {path.name: path.stat().st_mtime_ns for path in resume.glob("*.zip")}
+    before = {path.name: path.stat().st_mtime_ns for path in resume.glob("*/*.zip")}
     build_synthetic(tmp_path / "second", resume_dir=resume)
-    after = {path.name: path.stat().st_mtime_ns for path in resume.glob("*.zip")}
+    after = {path.name: path.stat().st_mtime_ns for path in resume.glob("*/*.zip")}
     assert before and before == after
 
 
@@ -132,3 +132,44 @@ def test_params_reject_wrong_stats(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="three floats"):
         preprocess.read_params(path)
+
+
+@pytest.mark.parametrize(
+    "path", ["/content/drive", "/content/drive/MyDrive/x", "/content/drive/../drive/MyDrive"]
+)
+def test_paths_on_drive_are_rejected(path: str) -> None:
+    with pytest.raises(ValueError, match="Google Drive"):
+        preprocess.check_off_drive(Path(path), "out_dir")
+
+
+@pytest.mark.parametrize("path", ["/content/work", "/content/drive2", "/content/medical/data"])
+def test_vm_paths_are_accepted(path: str) -> None:
+    preprocess.check_off_drive(Path(path), "out_dir")
+
+
+@pytest.mark.parametrize("argument", ["out_dir", "manifest_path", "work_dir", "resume_dir"])
+def test_stage_refuses_to_write_to_drive(tmp_path: Path, argument: str) -> None:
+    paths = {
+        "out_dir": tmp_path / "out",
+        "manifest_path": tmp_path / "manifest.csv",
+        "work_dir": tmp_path / "work",
+        "resume_dir": tmp_path / "resume",
+    }
+    paths[argument] = Path("/content/drive/MyDrive/aiml02") / argument
+    with pytest.raises(ValueError, match="Google Drive"):
+        preprocess.run_stage(
+            tmp_path / "data.zip",
+            tmp_path / "splits",
+            paths["out_dir"],
+            paths["manifest_path"],
+            paths["work_dir"],
+            PARAMS,
+            paths["resume_dir"],
+        )
+    assert not (tmp_path / "out").exists()
+
+
+def test_resume_folder_is_keyed_by_params(tmp_path: Path) -> None:
+    resume = tmp_path / "vm-resume"
+    build_synthetic(tmp_path / "run", resume_dir=resume)
+    assert [path.name for path in resume.iterdir()] == ["32px-5"]

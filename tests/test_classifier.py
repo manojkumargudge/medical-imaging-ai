@@ -12,7 +12,7 @@ from src.data.eda import FINDINGS
 from src.models import evaluate, train
 from src.models.classifier import build_loss, build_model
 from src.models.config import ClassifierConfig, load_config
-from src.models.data import read_manifest
+from src.models.data import make_datasets, read_manifest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = REPO_ROOT / "configs" / "classifier.yaml"
@@ -181,3 +181,12 @@ def test_thresholds_come_from_val_only(synthetic: Synthetic) -> None:
         FINDINGS, {"val": val, "test": replace(test, scores=1 - test.scores)}, 1, {}
     )
     assert report["thresholds"] == changed["thresholds"]
+
+
+@pytest.mark.parametrize("field", ["processed_dir", "manifest"])
+def test_training_data_must_not_be_on_drive(
+    synthetic: Synthetic, tmp_path: Path, field: str
+) -> None:
+    config = tiny_config(synthetic, tmp_path, **{field: Path("/content/drive/MyDrive/nih_224")})
+    with pytest.raises(ValueError, match="Google Drive"):
+        make_datasets(config)

@@ -24,7 +24,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from src.data.eda import NO_FINDING
-from src.data.preprocess import MANIFEST_COLUMNS, PREPROCESS_INFO
+from src.data.preprocess import MANIFEST_COLUMNS, PREPROCESS_INFO, check_off_drive
 from src.data.split import SPLITS
 from src.models.config import AugmentConfig, ClassifierConfig
 
@@ -168,6 +168,9 @@ class ShardDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
 def make_datasets(
     config: ClassifierConfig, splits: Sequence[str] = SPLITS
 ) -> dict[str, ShardDataset]:
+    # Training reads from the VM disk only (after `dvc pull`), never from Drive.
+    check_off_drive(config.processed_dir, "processed_dir")
+    check_off_drive(config.manifest, "manifest")
     info = read_preprocess_info(config.processed_dir)
     samples = read_manifest(config.manifest, config.labels)
     return {

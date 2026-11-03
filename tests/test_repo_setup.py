@@ -69,3 +69,19 @@ def test_data_and_credentials_are_git_ignored(path: str) -> None:
 )
 def test_pipeline_files_stay_tracked(path: str) -> None:
     assert not is_git_ignored(path)
+
+
+def test_tracked_text_files_have_no_control_characters() -> None:
+    # A "\a" in a Python string once turned "My Drive\aiml02" into a BEL character in the README.
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+    ).stdout.split()
+    suffixes = {".md", ".py", ".yaml", ".yml", ".toml", ".ipynb", ".txt", ".cfg"}
+    bad = []
+    for name in tracked:
+        path = REPO_ROOT / name
+        if path.suffix in suffixes and path.exists():
+            text = path.read_text(encoding="utf-8")
+            if any(ord(char) < 32 and char not in "\n\t\r" for char in text):
+                bad.append(name)
+    assert not bad

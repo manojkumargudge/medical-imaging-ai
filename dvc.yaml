@@ -21,8 +21,9 @@ stages:
       - data/splits
   preprocess:
     # Runs on Colab (Linux): the shell expands $NIH_ZIP (the Kaggle zip, about 45 GB, not a dep
-    # because hashing it is slow and it is deleted afterwards) and $AIML02_RESUME_DIR (a Drive
-    # folder that survives a disconnect; empty = build straight into the output folder).
+    # because hashing it is slow and it is deleted afterwards) and $AIML02_RESUME_DIR (a VM folder
+    # that survives a failed run; empty = build straight into the output folder). All outputs go
+    # to the VM disk; `dvc push` copies them to the Drive remote.
     cmd: >-
       python -m src.data.preprocess
       --zip "$NIH_ZIP"

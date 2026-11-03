@@ -1,8 +1,9 @@
 """Resize images to 224px grayscale PNG and store them in zip shards with a checksum manifest.
 
-DVC stage `preprocess`, run on Colab by notebooks/colab_preprocess.ipynb. Resumable: a shard is
-recorded in the manifest only after it is complete in the output folder, and a rerun skips recorded
-shards after checking their sha256.
+DVC stage `preprocess`, run on Colab by notebooks/colab_preprocess.ipynb. Everything is written to
+the Colab VM disk, never to Drive: Drive holds only the DVC remote, filled by `dvc push`. Resumable
+within a VM session: a shard is recorded in the manifest only after it is complete, and a rerun
+skips recorded shards after checking their sha256.
 
 Pixels are stored as 8-bit grayscale, not as normalized floats: float32 RGB tensors would need about
 67 GB instead of a few GB. The ImageNet mean and std are stage parameters, written to
@@ -36,6 +37,8 @@ SHARD_SIZE = 2_000
 SHARDS_MANIFEST = "shards.csv"
 IMAGES_MANIFEST = "images.csv"
 PREPROCESS_INFO = "preprocess.json"
+# Google Drive as mounted on Colab. Stage outputs and training data must not live under it.
+DRIVE_MOUNT = "/content/drive"
 # The training manifest: one row per image, with the split columns plus where the image is stored.
 MANIFEST_COLUMNS = (*split.COLUMNS, "split", "shard", "sha256")
 
@@ -278,6 +281,17 @@ class ZipImages:
         self._zip.close()
 
 
+def check_off_drive(path: Path, what: str) -> None:
+    """Fail if path is on the mounted Google Drive (slow, and its space is kept for the remote)."""
+    # resolve() follows symlinks into Drive; the drive letter is dropped so tests behave the same
+    # on Windows.
+    posix = path.resolve().as_posix()
+    if len(posix) > 1 and posix[1] == ":":
+        posix = posix[2:]
+    if posix == DRIVE_MOUNT or posix.startswith(DRIVE_MOUNT + "/"):
+        raise ValueError(f"{what} {posix} is on Google Drive; use the VM disk")
+
+
 def read_params(path: Path) -> dict[str, Any]:
     """The `preprocess` section of params.yaml, checked."""
     params = yaml.safe_load(path.read_text(encoding="utf-8"))["preprocess"]
@@ -352,9 +366,18 @@ def run_stage(
 ) -> Report:
     """Resize every split image from the dataset zip into verified shards plus a manifest.
 
-    With resume_dir (a Drive folder on Colab), the shards are built there, so a disconnect loses at
-    most one shard, and are copied into out_dir once complete and verified.
+    With resume_dir (a VM folder outside the DVC outputs), the shards are built in a subfolder named
+    after the image and shard size, so an interrupted `dvc repro` (which deletes its outputs first)
+    restarts from the last finished shard; they are copied into out_dir once complete and
+    verified. No path may be on Google Drive.
     """
+    for path, what in (
+        (out_dir, "out_dir"),
+        (manifest_path, "manifest"),
+        (work_dir, "work_dir"),
+        *([(resume_dir, "resume_dir")] if resume_dir is not None else []),
+    ):
+        check_off_drive(path, what)
     splits = split.read_splits(splits_dir)
     split.check_patient_level(splits)
     wanted = sorted(entry.image for name in split.SPLITS for entry in splits[name])
@@ -370,7 +393,10 @@ def run_stage(
             raise ValueError(f"{len(missing)} split images are not in the zip, e.g. {missing[:3]}")
         if len(in_zip) != len(wanted):
             raise ValueError(f"the zip has {len(in_zip) - len(wanted)} images that are in no split")
-        build_dir = resume_dir if resume_dir is not None else out_dir
+        build_dir = out_dir
+        if resume_dir is not None:
+            # Keyed by the params, so shards of another size are never reused.
+            build_dir = resume_dir / f"{params['image_size']}px-{params['shard_size']}"
         write_shards(
             wanted,
             images.read,
@@ -382,7 +408,7 @@ def run_stage(
     finally:
         images.close()
 
-    report = copy_shards(build_dir, out_dir) if resume_dir is not None else verify_shards(out_dir)
+    report = copy_shards(build_dir, out_dir) if build_dir != out_dir else verify_shards(out_dir)
     rows = build_manifest(splits, out_dir / IMAGES_MANIFEST)
     lines = io.StringIO()
     writer = csv.writer(lines, lineterminator="\n")
@@ -414,7 +440,7 @@ def main() -> None:
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--params", type=Path, default=Path("params.yaml"))
     parser.add_argument(
-        "--resume-dir", default="", help="optional build folder that survives a disconnect"
+        "--resume-dir", default="", help="optional VM build folder that survives a failed run"
     )
     args = parser.parse_args()
     if not args.zip:
