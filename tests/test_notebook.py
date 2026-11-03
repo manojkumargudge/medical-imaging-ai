@@ -58,11 +58,43 @@ def test_raw_zip_stays_on_the_vm_and_is_read_without_extracting() -> None:
     assert '"NIH_ZIP": str(ZIP)' in source
 
 
-def test_stage_resumes_from_the_drive_manifest() -> None:
+def test_stage_builds_on_the_vm_disk_and_resumes_from_the_manifest() -> None:
     source = "\n".join(sources(PREPROCESS))
-    assert 'RESUME = Path("/content/drive/MyDrive/aiml02-work/nih_224")' in source
+    assert 'RESUME = Path("/content/work/nih_224")' in source
     assert '"AIML02_RESUME_DIR": str(RESUME)' in source
     assert 'run("dvc", "repro", "preprocess"' in source
+
+
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+def test_drive_paths_are_only_the_remote_runs_and_checks(path: Path) -> None:
+    source = "\n".join(sources(path))
+    drive_lines = [line for line in source.splitlines() if "/content/drive" in line]
+    assert drive_lines
+    allowed = (
+        "aiml02-dvc",
+        "aiml02-runs",
+        'drive.mount("/content/drive")',
+        'startswith("/content/drive")',
+        'run("df", "-h"',
+        'free_gb("/content/drive")',
+        "free_gb('/content/drive')",
+    )
+    assert all(any(token in line for token in allowed) for line in drive_lines), drive_lines
+
+
+@pytest.mark.parametrize("path", [PREPROCESS, TRAIN])
+def test_nothing_is_deleted_on_drive(path: Path) -> None:
+    source = "\n".join(sources(path))
+    assert "rmtree" not in source and "os.remove" not in source
+    # The only delete is the Kaggle zip on the VM, in the preprocess notebook.
+    assert source.count(".unlink(") == (1 if path == PREPROCESS else 0)
+
+
+def test_train_notebook_pulls_to_the_vm_and_checks_the_path() -> None:
+    source = "\n".join(sources(TRAIN))
+    assert 'run("dvc", "pull"' in source
+    assert source.index('run("dvc", "pull"') < source.index("train.train(config)")
+    assert 'assert not str(path.resolve()).startswith("/content/drive")' in source
 
 
 def test_zip_is_deleted_only_after_verification_and_confirmation() -> None:

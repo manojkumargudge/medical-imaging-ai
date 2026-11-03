@@ -66,14 +66,20 @@ Then build the splits and the report:
 The default DVC remote is a folder on Google Drive, `MyDrive/aiml02-dvc`, configured in
 `.dvc/config` as the Colab mount path `/content/drive/MyDrive/aiml02-dvc`.
 
+**Storage rule:** data is built and read on the Colab VM disk. Drive holds only the DVC remote
+(written by `dvc push`), the training checkpoints and the reports. The notebooks delete nothing on
+Drive. The code enforces this: the preprocess stage and the training loader refuse any data path
+under `/content/drive`.
+
 **On Colab**, `notebooks/colab_preprocess.ipynb` does the following:
 
 1. It checks free disk space on the VM and on Drive (`df -h`) and stops if either is short.
 2. It downloads the Kaggle zip (about 45 GB) to the VM and reads the images straight from it.
    Only the three metadata files are copied out, and they are checked against `dvc.lock`.
 3. It runs `dvc repro preprocess` with `NIH_ZIP` (the zip) and `AIML02_RESUME_DIR`
-   (`MyDrive/aiml02-work/nih_224`). Shards are built in the resume folder and recorded in its
-   manifest only when complete, so a rerun after a disconnect skips finished shards.
+   (`/content/work/nih_224`, on the VM). Shards are built there and recorded in its manifest only
+   when complete. A rerun in the same session skips finished shards; a disconnect wipes the VM, so
+   the run starts over. The DVC cache is set to hardlink, so it adds no second copy.
 4. It verifies the shards and the manifest, with counts on both sides and a check that no patient
    is in two splits, then runs `dvc push` to the Drive remote.
 5. It copies `dvc.lock` to `MyDrive/aiml02-runs/preprocess/dvc.lock.<commit>`.
@@ -93,7 +99,7 @@ Stage `preprocess`: deps `data/splits` and the code; params `preprocess.*` in `p
 Then commit the `dvc.lock` from Drive (step 5), so that `dvc pull` knows the outputs:
 
 ```powershell
-Copy-Item "G:\My Driveiml02-runs\preprocess\dvc.lock.<commit>" dvc.lock
+Copy-Item "G:\My Drive\aiml02-runs\preprocess\dvc.lock.<commit>" dvc.lock
 git diff dvc.lock   # only the preprocess entry should be new
 ```
 
@@ -101,20 +107,37 @@ git diff dvc.lock   # only the preprocess entry should be new
 
 1. Install it and sign in with the same Google account. `My Drive` appears as a drive letter,
    for example `G:\My Drive`.
-2. In its settings, either choose **Mirror files**, or right-click `My Driveiml02-dvc` and choose
+2. In its settings, either choose **Mirror files**, or right-click `My Drive\aiml02-dvc` and choose
    **Make available offline**. Streamed files are fetched one by one on first read, which makes
    `dvc pull` slow.
 3. Point DVC at the local path. This goes to `.dvc/config.local`, which is not committed, so the
    Colab path in `.dvc/config` stays as it is:
 
    ```powershell
-   .venv\Scripts\dvc remote modify --local drive url "G:\My Driveiml02-dvc"
+   .venv\Scripts\dvc remote modify --local drive url "G:\My Drive\aiml02-dvc"
    .venv\Scripts\dvc pull preprocess
    .venv\Scripts\dvc status --cloud
    ```
 
 `dvc push` from the laptop goes to the same folder and syncs to Drive in the background. Wait for
 Drive for desktop to finish syncing before you run the Colab notebooks.
+
+`notebooks/colab_train.ipynb` runs `dvc pull` to the VM disk (about 4 to 6 GB) and trains from
+there. It asserts that the data path is not under `/content/drive`.
+
+### Drive usage
+
+| What | Where on Drive | Size |
+|---|---|---|
+| DVC remote: NIH 224px shards and manifests | `aiml02-dvc/` | about 4 to 6 GB (estimate: 112,120 PNGs at 35 to 50 KB; not measured yet) |
+| DVC remote: split CSVs | `aiml02-dvc/` | 5 MB (measured locally) |
+| Classifier checkpoints, 5 epochs | `aiml02-runs/classifier/` | 5 × 84.5 MB = 0.42 GB (measured: DenseNet121 weights + AdamW state) |
+| Reports and `dvc.lock` copies | `aiml02-runs/` | under 1 MB |
+| **Total** | | **about 4.5 to 6.5 GB** |
+
+The previous layout also kept a resume copy of the shards on Drive, about 12 GB in total. The
+preprocess notebook stops if Drive has less than about 7 GB free (6 GB of shards plus 1 GB margin,
+minus what is already in the remote).
 
 ## Classifier
 
