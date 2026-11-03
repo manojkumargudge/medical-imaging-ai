@@ -1,0 +1,51 @@
+# Chest X-ray classifier (AIML-02). For education only, not for clinical use.
+# Fixed config: src/models/config.py rejects anything it does not support.
+
+data:
+  processed_dir: data/processed/nih_224 # DVC stage preprocess (shards + preprocess.json)
+  manifest: data/manifests/nih_224.csv # DVC stage preprocess
+  num_workers: 2 # Colab VMs have 2 CPU cores
+
+model:
+  architecture: densenet121
+  weights: IMAGENET1K_V1 # torchvision ImageNet weights
+  # 14 findings, multi-label; "No Finding" is not a label (it means all 14 are 0).
+  labels:
+    - Atelectasis
+    - Cardiomegaly
+    - Consolidation
+    - Edema
+    - Effusion
+    - Emphysema
+    - Fibrosis
+    - Hernia
+    - Infiltration
+    - Mass
+    - Nodule
+    - Pleural_Thickening
+    - Pneumonia
+    - Pneumothorax
+
+train:
+  loss: bce_with_logits
+  batch_size: 64
+  optimizer: adamw
+  lr: 1.0e-4
+  weight_decay: 1.0e-2 # torch AdamW default
+  max_epochs: 5
+  amp: true # used only on a CUDA GPU
+  seed: 42
+  selection_metric: val_mean_auroc # best epoch = highest mean AUROC over the 14 labels on val
+  # One checkpoint per epoch, never overwritten; a rerun resumes from the latest one.
+  checkpoint_dir: /content/drive/MyDrive/aiml02-runs/classifier
+
+# Train split only. No flips: left and right are not interchangeable in a chest X-ray.
+augment:
+  rotation_degrees: 5
+  translate: 0.05 # fraction of the image size, each direction
+  brightness: 0.1
+  contrast: 0.1
+
+evaluation:
+  # A subgroup AUROC enters the subgroup mean only with at least this many positives.
+  subgroup_min_positives: 10
