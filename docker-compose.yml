@@ -1,0 +1,51 @@
+# Orthanc DICOM server and a separate Postgres for inference results. For education only, not for
+# clinical use: synthetic or public de-identified data only.
+#
+# cp .env.example .env, set the passwords, then: docker compose up -d
+# Ports are bound to 127.0.0.1 only. The results database uses 5434 on the host, because 5432
+# (AIML-01) and 5433 (a local PostgreSQL 18 service) are taken on the development machine.
+
+name: aiml02
+
+services:
+  orthanc:
+    image: orthancteam/orthanc:26.9.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8042:8042" # REST API and Orthanc Explorer, basic auth
+      - "127.0.0.1:4242:4242" # DICOM (C-STORE etc.); DICOM itself has no password
+    environment:
+      ORTHANC__NAME: aiml02
+      ORTHANC__DICOM_AET: AIML02
+      ORTHANC__AUTHENTICATION_ENABLED: "true"
+      ORTHANC__REGISTERED_USERS: '{"${ORTHANC_USER:?set ORTHANC_USER in .env}": "${ORTHANC_PASSWORD:?set ORTHANC_PASSWORD in .env}"}'
+      # A study counts as complete (StableStudy) after 5 s without new instances.
+      ORTHANC__STABLE_AGE: "5"
+    volumes:
+      - orthanc-db:/var/lib/orthanc/db
+    healthcheck:
+      test: ["CMD", "/probes/test-aliveness.py"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  results-db:
+    image: postgres:16.14
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RESULTS_DB_PORT:-5434}:5432"
+    environment:
+      POSTGRES_DB: aiml02_results
+      POSTGRES_USER: aiml02
+      POSTGRES_PASSWORD: ${RESULTS_DB_PASSWORD:?set RESULTS_DB_PASSWORD in .env}
+    volumes:
+      - results-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiml02 -d aiml02_results"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+volumes:
+  orthanc-db:
+  results-db:

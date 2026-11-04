@@ -44,7 +44,7 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "PD"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 strict = true
 warn_unreachable = true
 
@@ -82,4 +82,5 @@ pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
     "real_data: needs the DVC outputs under data/ (skipped if absent)",
+    "integration: needs the docker-compose.yml services (run with AIML02_INTEGRATION=1)",
 ]

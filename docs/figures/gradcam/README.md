@@ -73,7 +73,9 @@ the model attends to the right region.
 - **Below the threshold (4 images, all missed positives):** the maps sit outside the lungs or at
   the image edge, as in 00000041_006, 00000150_000 and 00000211_023. For 00000398_001 the map is
   just below the heart.
-- **Effusion:** 3 of 4 Effusion positives are below the threshold, so they would be missed.
+- **Effusion:** 3 of 4 Effusion positives are below the threshold, so they would be missed. With
+  4 images, the miss count is not a rate. At this threshold, test sensitivity for Effusion is
+  0.864 on 4,658 positives ([results_v2.md](../../results_v2.md)).
 - **Cardiac devices:**
   - 4 of the 6 set 1 images show a pacemaker: patient 13's three images and 00000116_000, which
     includes both set 1 Cardiomegaly images.
