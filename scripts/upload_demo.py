@@ -70,13 +70,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--spleen-dir", type=Path, default=SPLEEN_IMAGES)
     args = parser.parse_args(argv)
     load_env()
-    orthanc = Orthanc.from_env()
+    upload_all(Orthanc.from_env(), args.png, args.data_entry, args.spleen_case, args.spleen_dir)
 
-    uploads = [
-        (path.name, upload_dx(orthanc, dx_from_png(path, args.data_entry))) for path in args.png
-    ]
-    nifti = args.spleen_dir / f"{args.spleen_case}.nii.gz"
-    uploads.append((args.spleen_case, upload_ct(orthanc, nifti, args.spleen_case)))
+
+def upload_all(
+    orthanc: Orthanc,
+    pngs: Sequence[Path] = DEFAULT_PNGS,
+    data_entry: Path = DATA_ENTRY,
+    spleen_case: str = DEFAULT_SPLEEN_CASE,
+    spleen_dir: Path = SPLEEN_IMAGES,
+) -> list[str]:
+    """Upload the demo studies, check each is found, and return their StudyInstanceUIDs."""
+    uploads = [(path.name, upload_dx(orthanc, dx_from_png(path, data_entry))) for path in pngs]
+    nifti = spleen_dir / f"{spleen_case}.nii.gz"
+    uploads.append((spleen_case, upload_ct(orthanc, nifti, spleen_case)))
     for source, upload in uploads:
         found = orthanc.find_study(upload["study_uid"])
         print(
@@ -85,6 +92,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         if not found:
             raise RuntimeError(f"{source}: study {upload['study_uid']} not found after upload")
+    return [upload["study_uid"] for _, upload in uploads]
 
 
 if __name__ == "__main__":

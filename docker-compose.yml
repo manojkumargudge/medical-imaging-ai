@@ -1,9 +1,13 @@
 # Orthanc DICOM server and a separate Postgres for inference results. For education only, not for
 # clinical use: synthetic or public de-identified data only.
 #
-# cp .env.example .env, set the passwords, then: docker compose up -d
-# Ports are bound to 127.0.0.1 only. The results database uses 5434 on the host, because 5432
-# (AIML-01) and 5433 (a local PostgreSQL 18 service) are taken on the development machine.
+# Demo stack: cp .env.example .env, set the passwords, then: docker compose up -d --wait
+# Test stack (integration tests, never the demo): a separate project with its own volumes, ports,
+# Orthanc name and database name:
+#   python -m scripts.make_test_env
+#   docker compose -p aiml02-test --env-file .env.test up -d --wait
+# Ports are bound to 127.0.0.1 only. The demo results database uses 5434 on the host, because
+# 5432 (AIML-01) and 5433 (a local PostgreSQL 18 service) are taken on the development machine.
 
 name: aiml02
 
@@ -12,10 +16,11 @@ services:
     image: orthancteam/orthanc:26.9.1
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8042:8042" # REST API and Orthanc Explorer, basic auth
-      - "127.0.0.1:4242:4242" # DICOM (C-STORE etc.); DICOM itself has no password
+      - "127.0.0.1:${ORTHANC_HTTP_PORT:-8042}:8042" # REST API and Orthanc Explorer, basic auth
+      - "127.0.0.1:${ORTHANC_DICOM_PORT:-4242}:4242" # DICOM; DICOM itself has no password
     environment:
-      ORTHANC__NAME: aiml02
+      # The scripts check this name, so they cannot act on the wrong stack.
+      ORTHANC__NAME: ${ORTHANC_NAME:-aiml02}
       ORTHANC__DICOM_AET: AIML02
       ORTHANC__AUTHENTICATION_ENABLED: "true"
       ORTHANC__REGISTERED_USERS: '{"${ORTHANC_USER:?set ORTHANC_USER in .env}": "${ORTHANC_PASSWORD:?set ORTHANC_PASSWORD in .env}"}'
@@ -35,13 +40,13 @@ services:
     ports:
       - "127.0.0.1:${RESULTS_DB_PORT:-5434}:5432"
     environment:
-      POSTGRES_DB: aiml02_results
+      POSTGRES_DB: ${RESULTS_DB_NAME:-aiml02_results}
       POSTGRES_USER: aiml02
       POSTGRES_PASSWORD: ${RESULTS_DB_PASSWORD:?set RESULTS_DB_PASSWORD in .env}
     volumes:
       - results-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiml02 -d aiml02_results"]
+      test: ["CMD-SHELL", "pg_isready -U aiml02 -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 24

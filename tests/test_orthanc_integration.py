@@ -1,7 +1,7 @@
 """Upload to the real Orthanc from docker-compose.yml, then find the studies there.
 
-Runs only with AIML02_INTEGRATION=1 and the services up (CI job `integration`, or locally after
-`docker compose up -d`). Synthetic images only.
+Runs only with AIML02_INTEGRATION=1 against the test stack (.env.test, compose project
+aiml02-test), never the demo; the Orthanc name is checked first. Synthetic images only.
 """
 
 import os
@@ -12,10 +12,11 @@ import nibabel as nib
 import numpy as np
 import pytest
 from PIL import Image
+from stack_helpers import integration_orthanc
 
 from scripts import upload_demo
 from src.dicom import convert
-from src.service.orthanc import Orthanc, OrthancError, load_env
+from src.service.orthanc import Orthanc, OrthancError
 
 pytestmark = [
     pytest.mark.integration,
@@ -27,8 +28,7 @@ pytestmark = [
 
 @pytest.fixture
 def orthanc() -> Orthanc:
-    load_env()
-    return Orthanc.from_env()
+    return integration_orthanc()
 
 
 def test_dx_and_ct_uploads_are_found(orthanc: Orthanc, tmp_path: Path) -> None:

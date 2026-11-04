@@ -1,7 +1,8 @@
 """The worker against the real Orthanc and Postgres from docker-compose.yml, with fake models.
 
-Runs only with AIML02_INTEGRATION=1 and the services up. Results go to session-only (TEMP)
-tables, so the real results tables are never written to or cleaned up.
+Runs only with AIML02_INTEGRATION=1 against the test stack (.env.test, compose project
+aiml02-test), never the demo; Orthanc and database names are checked first. Results go to
+session-only (TEMP) tables as well.
 """
 
 import os
@@ -11,10 +12,10 @@ from pathlib import Path
 
 import pytest
 from pydicom.dataset import Dataset
+from stack_helpers import integration_db_url, integration_orthanc
 from test_worker import classifier, ct_series, dx, segmenter
 
 from scripts import upload_demo
-from src.service.orthanc import Orthanc, load_env
 from src.service.store import PostgresStore, Result
 from src.service.worker import Worker
 
@@ -24,13 +25,6 @@ pytestmark = [
         os.environ.get("AIML02_INTEGRATION") != "1", reason="set AIML02_INTEGRATION=1"
     ),
 ]
-
-
-def results_db_url() -> str:
-    load_env()
-    port = os.environ.get("RESULTS_DB_PORT", "5434")
-    password = os.environ["RESULTS_DB_PASSWORD"]
-    return f"postgresql://aiml02:{password}@127.0.0.1:{port}/aiml02_results"
 
 
 def tagged_dx(tag: str) -> Dataset:
@@ -43,9 +37,8 @@ def tagged_dx(tag: str) -> Dataset:
 
 
 def test_worker_processes_new_studies_once(tmp_path: Path) -> None:
-    load_env()
-    orthanc = Orthanc.from_env()
-    store = PostgresStore(results_db_url(), temporary=True)
+    orthanc = integration_orthanc()
+    store = PostgresStore(integration_db_url(), temporary=True)
     store.set_last_seq(int(orthanc.get_json("/changes?last")["Last"]))
     start = store.last_seq()
 

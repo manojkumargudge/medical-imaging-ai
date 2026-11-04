@@ -140,6 +140,18 @@ class PostgresStore:
         )
         return cursor.rowcount == 1
 
+    def database(self) -> str:
+        row = self.connection.execute("SELECT current_database()").fetchone()
+        return str(row[0]) if row else ""
+
+    def count_results(self) -> int:
+        row = self.connection.execute("SELECT count(*) FROM inference_results").fetchone()
+        return int(row[0]) if row else 0
+
+    def delete_results(self) -> int:
+        """Delete every result row (scripts/reset_demo.py only); the change seq is kept."""
+        return self.connection.execute("DELETE FROM inference_results").rowcount
+
     def rows(self) -> list[dict[str, Any]]:
         cursor = self.connection.execute(
             "SELECT study_uid, modality, model, checkpoint_name, checkpoint_sha256, status, "
