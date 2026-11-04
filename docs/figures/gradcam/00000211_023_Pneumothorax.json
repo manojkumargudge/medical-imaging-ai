@@ -1,0 +1,15 @@
+{
+  "notice": "For education only, not for clinical use.",
+  "image": "00000211_023.png",
+  "label": "Pneumothorax",
+  "checkpoint": "epoch_003.pt",
+  "checkpoint_epoch": 3,
+  "score": 0.005461656954139471,
+  "score_note": "sigmoid of the model output; not a calibrated probability",
+  "threshold": 0.019946934655308723,
+  "threshold_set": "sensitivity_80",
+  "low_reliability": false,
+  "above_threshold": false,
+  "target_layer": "features.denseblock4",
+  "overlay": "00000211_023_Pneumothorax.png"
+}

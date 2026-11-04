@@ -20,6 +20,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `src/models/`: DenseNet121 classifier (config, data and augmentation, training, metrics,
   evaluation), 3D U-Net segmentation (`segmentation.py`), shared checkpoint helpers
 - `configs/classifier.yaml`, `configs/segmentation.yaml`: the fixed training configs
+- `src/explain/gradcam.py`: Grad-CAM overlays for the classifier
 - `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
   run yet)
 - `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
@@ -235,6 +236,35 @@ the same Drive folder):
 Run `notebooks/colab_train.ipynb` on a GPU runtime. On Colab, the notebooks use Colab's own torch
 build. The versions it uses are recorded in each checkpoint and in the report, and may differ from
 the local pins.
+
+## Grad-CAM
+
+`src/explain/gradcam.py` shows which regions of a chest X-ray raised one label's score.
+
+- **Target layer:** the classifier's last dense block (`features.denseblock4`).
+- **Preprocessing:** the image goes through the evaluation path: `resize_png` from the
+  preprocess stage, then the test-split transform from `src/models/data.py`.
+- **Output:** a map the size of the model input with values in [0, 1].
+
+```
+python -m src.explain.gradcam --checkpoint epoch_003.pt --image 00000013_045.png     --label Cardiomegaly --out-dir reports/gradcam
+```
+
+This writes:
+
+- an overlay PNG
+- a JSON with the score, plus the threshold and reliability from `configs/viewer_thresholds.yaml`
+
+It runs on CPU and never overwrites a file. Tests check four things:
+
+- the map size
+- the value range
+- determinism
+- the sanity check: the map changes when the top layers are randomized
+
+Six demo overlays from test-split images, with how they were chosen, are in
+[docs/figures/gradcam](docs/figures/gradcam/README.md). A map shows what raised the score, not
+where a finding is.
 
 ## Segmentation model (3D U-Net)
 
