@@ -208,6 +208,30 @@ Evaluation (`src/models/evaluate.py`) scores the best epoch on val and test and 
 - AUROC by sex and by age band. Ages above 100 are recording errors, so those images are counted
   but not scored.
 
+`python -m src.models.evaluate` now writes report version 2 by default:
+`reports/classifier_metrics_v2.json`, `reports/thresholds_v2.json` and `docs/results_v2.md`.
+Version 1 (`--version 1`) is unchanged, and an existing report is never replaced without
+`--overwrite`. Version 2 adds:
+
+- a second threshold set, also chosen on val only: per label, the highest threshold with val
+  sensitivity of at least 0.80. Labels with fewer than 30 val positives get no threshold (score
+  only). Test sensitivity and specificity are reported for both sets.
+- 95% bootstrap intervals (1000 resamples, seed 42, percentile) for per-label test AUROC and the
+  test mean AUROCs. Patients are resampled, each with all of its images.
+- sex and age-band means over one label set per grouping: the labels with at least 10 positives in
+  every group of that split, so that the groups are compared on the same labels.
+
+On Colab, after training (`--checkpoint-dir` points at the Drive checkpoints; the reports go to
+the same Drive folder):
+
+```
+!python -m src.models.evaluate --checkpoint-dir /content/drive/MyDrive/aiml02-runs/classifier \
+    --metrics /content/drive/MyDrive/aiml02-runs/classifier/reports/classifier_metrics_v2.json \
+    --thresholds /content/drive/MyDrive/aiml02-runs/classifier/reports/thresholds_v2.json \
+    --results /content/drive/MyDrive/aiml02-runs/classifier/reports/results_v2.md \
+    --repo-commit "$(git rev-parse HEAD)"
+```
+
 Run `notebooks/colab_train.ipynb` on a GPU runtime. On Colab, the notebooks use Colab's own torch
 build. The versions it uses are recorded in each checkpoint and in the report, and may differ from
 the local pins.

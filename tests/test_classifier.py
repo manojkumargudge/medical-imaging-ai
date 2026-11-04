@@ -165,6 +165,14 @@ def test_evaluation_writes_reports(synthetic: Synthetic, tmp_path: Path) -> None
         evaluate.write_outputs(report, metrics, thresholds, results)
     evaluate.write_outputs(report, metrics, thresholds, results, overwrite=True)
 
+    v2 = evaluate.evaluate(config, device=torch.device("cpu"), version=2)
+    assert v2["report_version"] == 2 and v2["checkpoint_epoch"] == report["checkpoint_epoch"]
+    assert [row["auroc"] for row in v2["splits"]["test"]["labels"]] == [
+        row["auroc"] for row in report["splits"]["test"]["labels"]
+    ]
+    with pytest.raises(ValueError, match="1 or 2"):
+        evaluate.evaluate(config, device=torch.device("cpu"), version=3)
+
 
 def test_thresholds_come_from_val_only(synthetic: Synthetic) -> None:
     import numpy as np
@@ -191,3 +199,146 @@ def test_training_data_must_not_be_on_drive(
     config = tiny_config(synthetic, tmp_path, **{field: Path("/content/drive/MyDrive/nih_224")})
     with pytest.raises(ValueError, match="Google Drive"):
         make_datasets(config)
+
+
+def fake_predictions(seed: int = 0) -> dict[str, evaluate.SplitPredictions]:
+    """Val and test with distinct patients (two images each) and labels of varied frequency."""
+    import numpy as np
+
+    from src.models.data import Sample
+
+    rng = np.random.default_rng(seed)
+    # Label i has prevalence rising with i, so the first labels have fewer than 30 val positives.
+    prevalence = np.linspace(0.01, 0.5, len(FINDINGS))
+    result = {}
+    for split, patients, first in (("val", 150, 0), ("test", 200, 1000)):
+        samples, targets = [], []
+        for number in range(first, first + patients):
+            age = 150 if number == first else int(rng.integers(5, 95))
+            for image in range(2):
+                row = (rng.random(len(FINDINGS)) < prevalence).astype(int)
+                targets.append(row)
+                samples.append(
+                    Sample(
+                        f"{number}_{image}.png",
+                        str(number),
+                        split,
+                        "s0",
+                        age,
+                        "F" if number % 2 else "M",
+                        tuple(int(v) for v in row),
+                    )
+                )
+        values = np.array(targets, dtype=float)
+        scores = np.clip(values * 0.4 + rng.random(values.shape), 0, None)
+        result[split] = evaluate.SplitPredictions(samples, values, scores)
+    return result
+
+
+def test_v2_report_thresholds_intervals_and_subgroups() -> None:
+    import numpy as np
+
+    from src.models import metrics
+
+    predictions = fake_predictions()
+    val_patients = {sample.patient for sample in predictions["val"].samples}
+    test_patients = {sample.patient for sample in predictions["test"].samples}
+    print(f"patients: val {len(val_patients)}, test {len(test_patients)}")
+    assert val_patients and test_patients and not val_patients & test_patients
+
+    report = evaluate.build_report_v2(FINDINGS, predictions, 10, {}, resamples=200)
+    sets = report["thresholds"]["sets"]
+    assert report["thresholds"]["selected_on"] == "val"
+    val, test = report["splits"]["val"], report["splits"]["test"]
+
+    few = [row["label"] for row in val["labels"] if row["positives"] < 30]
+    many = [row["label"] for row in val["labels"] if row["positives"] >= 30]
+    print(f"labels with <30 val positives: {len(few)}, with >=30: {len(many)}")
+    assert few and many
+    assert all(sets["sensitivity_80"]["labels"][label] is None for label in few)
+    for index, label in enumerate(FINDINGS):
+        chosen = sets["sensitivity_80"]["labels"][label]
+        row = test["labels"][index]
+        if chosen is None:
+            assert row["at_thresholds"]["sensitivity_80"] is None
+            continue
+        assert chosen["sensitivity"] >= 0.8
+        assert (
+            chosen["sensitivity"]
+            == val["labels"][index]["at_thresholds"]["sensitivity_80"]["sensitivity"]
+        )
+        expected = metrics.threshold_metrics(
+            predictions["test"].targets[:, index],
+            predictions["test"].scores[:, index],
+            chosen["threshold"],
+        )
+        assert row["at_thresholds"]["sensitivity_80"] == expected
+        assert row["at_thresholds"]["best_f1"] is not None
+
+    # Intervals on test only, per label and for every mean.
+    assert all("auroc_ci" not in row for row in val["labels"]) and "mean_auroc_ci" not in val
+    for row in test["labels"]:
+        assert row["auroc_ci"]["low"] <= row["auroc"] <= row["auroc_ci"]["high"]
+    assert test["mean_auroc_ci"]["valid_resamples"] > 0
+
+    # One label set per grouping, used by every group; the invalid age band is not scored.
+    for split in (val, test):
+        for key in ("by_sex", "by_age_band"):
+            shared = split[key]["labels_in_mean"]
+            scored = {g: e for g, e in split[key]["groups"].items() if not e.get("excluded")}
+            assert shared and len(scored) >= 2
+            for entry in scored.values():
+                rows = {row["label"]: row for row in entry["labels"]}
+                assert all(rows[label]["positives"] >= 10 for label in shared)
+                assert entry["mean_auroc"] == pytest.approx(
+                    np.mean([rows[label]["auroc"] for label in shared])
+                )
+                assert ("mean_auroc_ci" in entry) == (split is test)
+    assert test["by_age_band"]["groups"]["invalid (age > 100)"] == {"images": 2, "excluded": True}
+
+    # Same seed, same report; other test scores leave both threshold sets unchanged.
+    assert evaluate.build_report_v2(FINDINGS, predictions, 10, {}, resamples=200) == report
+    flipped = {
+        **predictions,
+        "test": replace(predictions["test"], scores=1 - predictions["test"].scores),
+    }
+    changed = evaluate.build_report_v2(FINDINGS, flipped, 10, {}, resamples=20)
+    assert changed["thresholds"] == report["thresholds"]
+
+
+def test_v2_outputs_leave_v1_files_untouched(tmp_path: Path) -> None:
+    predictions = fake_predictions()
+    meta = {
+        "checkpoint_epoch": 1,
+        "history": [{"epoch": 1, "train_loss": 0.5, "val_mean_auroc": 0.6}],
+    }
+    v1 = {name: tmp_path / path for name, path in evaluate.OUTPUTS[1].items()}
+    v2 = {name: tmp_path / path for name, path in evaluate.OUTPUTS[2].items()}
+    assert not set(v1.values()) & set(v2.values())
+    assert {path.name for path in v2.values()} == {
+        "classifier_metrics_v2.json",
+        "thresholds_v2.json",
+        "results_v2.md",
+    }
+
+    evaluate.write_outputs(
+        evaluate.build_report(FINDINGS, predictions, 10, meta),
+        v1["metrics"],
+        v1["thresholds"],
+        v1["results"],
+    )
+    before = {name: path.read_bytes() for name, path in v1.items()}
+    report = evaluate.build_report_v2(FINDINGS, predictions, 10, meta, resamples=50)
+    evaluate.write_outputs(report, v2["metrics"], v2["thresholds"], v2["results"])
+    after = {name: path.read_bytes() for name, path in v1.items()}
+    for name in v1:
+        lines = (before[name].count(b"\n"), after[name].count(b"\n"))
+        print(f"{name}: v1 lines before {lines[0]}, after {lines[1]}")
+        assert before[name] and after[name] and before[name] == after[name]
+
+    text = v2["results"].read_text()
+    assert "For education only, not for clinical use." in text
+    assert "score only" in text and "95% CI" in text
+    assert json.loads(v2["thresholds"].read_text())["sets"].keys() == {"best_f1", "sensitivity_80"}
+    with pytest.raises(FileExistsError):
+        evaluate.write_outputs(report, v2["metrics"], v2["thresholds"], v2["results"])
