@@ -196,18 +196,26 @@ def build_loss() -> nn.Module:
     return DiceCELoss(to_onehot_y=True, softmax=True)
 
 
-def build_transforms(config: SegConfig, train: bool) -> Compose:
-    """Deterministic preprocessing for every split; random crops and augmentation for train only."""
+def build_transforms(config: SegConfig, train: bool, keys: Sequence[str] = KEYS) -> Compose:
+    """Deterministic preprocessing for every split; random crops and augmentation for train only.
+
+    keys=("image",) gives the same evaluation preprocessing for an image without a label
+    (inference in the worker).
+    """
+    if train and tuple(keys) != KEYS:
+        raise ValueError("training needs both image and label")
+    keys = list(keys)
+    modes = [{"image": "bilinear", "label": "nearest"}[key] for key in keys]
     low, high = config.hu_window
     steps: list[Any] = [
-        LoadImaged(keys=KEYS),
-        EnsureChannelFirstd(keys=KEYS),
+        LoadImaged(keys=keys),
+        EnsureChannelFirstd(keys=keys),
         # Explicit labels: MONAI is changing the default axis labels of Orientationd.
-        Orientationd(keys=KEYS, axcodes="RAS", labels=(("L", "R"), ("P", "A"), ("I", "S"))),
-        Spacingd(keys=KEYS, pixdim=config.pixdim, mode=("bilinear", "nearest")),
+        Orientationd(keys=keys, axcodes="RAS", labels=(("L", "R"), ("P", "A"), ("I", "S"))),
+        Spacingd(keys=keys, pixdim=config.pixdim, mode=modes),
         ScaleIntensityRanged(keys="image", a_min=low, a_max=high, b_min=0.0, b_max=1.0, clip=True),
-        CropForegroundd(keys=KEYS, source_key="image", allow_smaller=True),
-        EnsureTyped(keys=KEYS, track_meta=not train),
+        CropForegroundd(keys=keys, source_key="image", allow_smaller=True),
+        EnsureTyped(keys=keys, track_meta=not train),
     ]
     if train:
         positive = config.positive_fraction

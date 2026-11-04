@@ -61,3 +61,6 @@ Thumbs.db
 *.log
 tmp/
 temp/
+
+# Worker outputs (overlays, masks) from docker-compose.worker.yml
+/results/
