@@ -1,8 +1,10 @@
-"""Multi-label metrics: per-label AUROC, F1-optimal thresholds and subgroup AUROC."""
+"""Multi-label metrics: per-label AUROC, thresholds, subgroup AUROC and bootstrap intervals."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
+from fractions import Fraction
 from typing import Any
 
 import numpy as np
@@ -64,6 +66,26 @@ def best_f1_threshold(targets: Array, scores: Array) -> dict[str, float] | None:
         "f1": float(f1[best]),
         "precision": float(precision[best]),
         "recall": float(recall[best]),
+    }
+
+
+def sensitivity_threshold(
+    targets: Array, scores: Array, target: float, min_positives: int
+) -> dict[str, float] | None:
+    """The highest threshold (predict positive when score >= threshold) whose sensitivity is at
+    least `target`, so specificity is as high as that sensitivity allows. None with fewer than
+    `min_positives` positives or no negatives: such a label gets a score only."""
+    positives = np.sort(scores[targets.astype(bool)])[::-1]
+    if len(positives) < max(min_positives, 1) or len(positives) == len(targets):
+        return None
+    # Exact arithmetic: 0.8 * 30 is 24.000000000000004 in floating point.
+    needed = math.ceil(Fraction(str(target)) * len(positives))
+    threshold = float(positives[needed - 1])
+    at = threshold_metrics(targets, scores, threshold)
+    return {
+        "threshold": threshold,
+        "sensitivity": at["sensitivity"],
+        "specificity": at["specificity"],
     }
 
 
@@ -130,3 +152,93 @@ def subgroup_aurocs(
             "labels": rows,
         }
     return result
+
+
+def common_labels(
+    targets: Array,
+    groups: Sequence[str],
+    labels: Sequence[str],
+    min_positives: int,
+    excluded: Sequence[str] = (),
+) -> list[str]:
+    """Labels with at least `min_positives` positives and one negative in every scored group,
+    so that every group's mean AUROC is taken over the same labels."""
+    names = np.asarray(groups)
+    if len(names) != len(targets):
+        raise ValueError(f"{len(names)} group values for {len(targets)} rows")
+    masks = [names == group for group in sorted(set(groups)) if group not in excluded]
+    if not masks:
+        return []
+    return [
+        label
+        for index, label in enumerate(labels)
+        if all(min_positives <= targets[mask, index].sum() < mask.sum() for mask in masks)
+    ]
+
+
+class _RankedScores:
+    """One label's scores ranked once; a bootstrap resample is then a weighted count, which is
+    the Mann-Whitney form of AUROC (ties count one half)."""
+
+    def __init__(self, targets: Array, scores: Array) -> None:
+        _, blocks = np.unique(scores, return_inverse=True)
+        self.size = int(blocks.max()) + 1 if len(blocks) else 0
+        positive = targets.astype(bool)
+        self.positive_rows, self.negative_rows = np.flatnonzero(positive), np.flatnonzero(~positive)
+        self.positive_blocks, self.negative_blocks = blocks[positive], blocks[~positive]
+
+    def auroc(self, weights: Array) -> float | None:
+        pos = np.bincount(self.positive_blocks, weights[self.positive_rows], self.size)
+        neg = np.bincount(self.negative_blocks, weights[self.negative_rows], self.size)
+        total_pos, total_neg = pos.sum(), neg.sum()
+        if total_pos == 0 or total_neg == 0:
+            return None
+        below = np.cumsum(neg) - neg
+        return float(np.sum(pos * (below + 0.5 * neg)) / (total_pos * total_neg))
+
+
+def _interval(values: Array, level: float) -> dict[str, Any] | None:
+    valid = values[~np.isnan(values)]
+    if len(valid) == 0:
+        return None
+    low, high = np.percentile(valid, [50 * (1 - level), 50 * (1 + level)])
+    return {"low": float(low), "high": float(high), "valid_resamples": len(valid)}
+
+
+def bootstrap_aurocs(
+    targets: Array,
+    scores: Array,
+    patients: Sequence[str],
+    labels: Sequence[str],
+    mean_labels: Sequence[str],
+    resamples: int,
+    seed: int,
+    level: float = 0.95,
+) -> dict[str, Any]:
+    """Percentile intervals for per-label AUROC and for the mean AUROC over `mean_labels`.
+
+    Patients are resampled with replacement, each with all of its images, because images of one
+    patient are not independent. A resample in which a label has only one class gives no AUROC
+    for that label (and no mean, if the label is in `mean_labels`); the number of usable
+    resamples is reported with each interval.
+    """
+    _check(targets, scores, labels)
+    if len(patients) != len(targets):
+        raise ValueError(f"{len(patients)} patient IDs for {len(targets)} rows")
+    _, patient_rows = np.unique(np.asarray(patients), return_inverse=True)
+    count = int(patient_rows.max()) + 1
+    ranked = [_RankedScores(targets[:, index], scores[:, index]) for index in range(len(labels))]
+    values = np.full((resamples, len(labels)), np.nan)
+    rng = np.random.default_rng(seed)
+    for resample in range(resamples):
+        draws = np.bincount(rng.integers(0, count, count), minlength=count)
+        weights = draws[patient_rows].astype(float)
+        for index, scores_for_label in enumerate(ranked):
+            auroc = scores_for_label.auroc(weights)
+            if auroc is not None:
+                values[resample, index] = auroc
+    columns = [list(labels).index(label) for label in mean_labels]
+    return {
+        "labels": {label: _interval(values[:, index], level) for index, label in enumerate(labels)},
+        "mean": _interval(values[:, columns].mean(axis=1), level) if columns else None,
+    }
