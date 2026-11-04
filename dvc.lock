@@ -58,3 +58,44 @@ stages:
       hash: md5
       md5: aca79cd47ac36788122bb6d39443e49c
       size: 2778
+  preprocess:
+    cmd: python -m src.data.preprocess --zip "$NIH_ZIP" --splits-dir data/splits
+      --out-dir data/processed/nih_224 --manifest data/manifests/nih_224.csv 
+      --work-dir data/cache/preprocess --resume-dir "$AIML02_RESUME_DIR" 
+      --params params.yaml
+    deps:
+    - path: data/splits
+      hash: md5
+      md5: ed8d7a3fd26261b678f1d6a9697ae5b2.dir
+      size: 4991375
+      nfiles: 3
+    - path: src/data/preprocess.py
+      hash: md5
+      md5: 76e66ca7ddee057c6069eb7d23117803
+      size: 18216
+    - path: src/data/split.py
+      hash: md5
+      md5: c7cea3de82c9a81c3471b8a7dcf0a048
+      size: 8838
+    params:
+      params.yaml:
+        preprocess.image_size: 224
+        preprocess.mean:
+        - 0.485
+        - 0.456
+        - 0.406
+        preprocess.shard_size: 2000
+        preprocess.std:
+        - 0.229
+        - 0.224
+        - 0.225
+    outs:
+    - path: data/manifests/nih_224.csv
+      hash: md5
+      md5: 2c24c02dac1300ff357d140564016a22
+      size: 14702636
+    - path: data/processed/nih_224
+      hash: md5
+      md5: cebe0dc453dd36aede2fb130180d830f.dir
+      size: 2399353317
+      nfiles: 60
