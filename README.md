@@ -427,6 +427,20 @@ Tests:
   - DX: scores must equal the Grad-CAM JSON scores within 1e-6.
   - CT: Dice on `spleen_14` must match `segmentation_metrics.json` within 0.005.
 
+## Viewer (Step 6, planned, not built)
+
+A React viewer for the results the worker stores. For education only, not for clinical use. It
+will need a small API of its own, because there is none yet. Planned features:
+
+- **Upload a scan:** a DICOM file goes into Orthanc, and the worker picks it up as a new stable
+  study. Demo or public de-identified data only.
+- **Scan and overlay:** show the scan with the AI overlay: Grad-CAM for DX, the spleen mask for CT.
+- **Score:** the confidence score, labelled as a model score rather than a calibrated
+  probability, with the threshold and the low-reliability flag from
+  `configs/viewer_thresholds.yaml`.
+- **Review:** Approve and Reject buttons for the reviewer.
+- **Audit log:** a record of every decision (who, when, which study, result and checkpoint).
+
 ## Checks
 
 ```powershell
