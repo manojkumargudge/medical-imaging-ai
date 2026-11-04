@@ -165,24 +165,26 @@ git diff dvc.lock   # only the preprocess entry should be new
 `dvc push` from the laptop goes to the same folder and syncs to Drive in the background. Wait for
 Drive for desktop to finish syncing before you run the Colab notebooks.
 
-`notebooks/colab_train.ipynb` runs `dvc pull` to the VM disk (about 4 to 6 GB) and trains from
+`notebooks/colab_train.ipynb` runs `dvc pull` to the VM disk (about 2.4 GB) and trains from
 there. It asserts that the data path is not under `/content/drive`.
 
 ### Drive usage
 
 | What | Where on Drive | Size |
 |---|---|---|
-| DVC remote: NIH 224px shards and manifests | `aiml02-dvc/` | about 4 to 6 GB (estimate: 112,120 PNGs at 35 to 50 KB; not measured yet) |
+| DVC remote: NIH 224px shards (`data/processed/nih_224`) | `aiml02-dvc/` | 2.40 GB (measured, `dvc.lock`: 57 shards plus manifests, 60 files; about 21 KB per image) |
+| DVC remote: NIH manifest (`data/manifests/nih_224.csv`) | `aiml02-dvc/` | 14.7 MB (measured, `dvc.lock`) |
 | DVC remote: split CSVs | `aiml02-dvc/` | 5 MB (measured locally) |
 | Classifier checkpoints, 5 epochs | `aiml02-runs/classifier/` | 5 × 84.5 MB = 0.42 GB (measured: DenseNet121 weights + AdamW state) |
 | Segmentation checkpoints, every 10 of 200 epochs | `aiml02-runs/segmentation/` | 20 × 57.9 MB = 1.16 GB (measured: 3D UNet weights + Adam state) |
 | MSD Task09_Spleen volumes | not on Drive | 0 (downloaded to the VM disk, md5 checked) |
 | Reports and `dvc.lock` copies | `aiml02-runs/` | under 1 MB |
-| **Total** | | **about 5.7 to 7.7 GB** |
+| **Total** | | **about 4.0 GB** |
 
-The previous layout also kept a resume copy of the shards on Drive, about 12 GB in total. The
-preprocess notebook stops if Drive has less than about 7 GB free (6 GB of shards plus 1 GB margin,
-minus what is already in the remote).
+The NIH sizes are from the Colab preprocess run (`dvc.lock`). The checkpoint sizes were measured
+locally by saving one checkpoint of each model; no training has run, so none are on Drive yet. The preprocess notebook still checks for about 7 GB
+free on Drive, because it was written with the earlier 6 GB shard estimate; the real need is about
+2.4 GB.
 
 ## Classifier
 
