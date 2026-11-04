@@ -1,0 +1,75 @@
+# Thresholds the viewer applies to classifier scores. For education only, not for clinical use.
+#
+# Values are copied from reports/thresholds_v2.json (checkpoint epoch 3, repo commit 30c5b98) and
+# were chosen on the NIH ChestX-ray14 val split only; tests/test_viewer_thresholds.py checks that
+# they still match. Scores are not calibrated probabilities: a threshold is a cut-off on the
+# model's score, not a probability of disease.
+#
+# set:
+#   sensitivity_80  set B, highest threshold with val sensitivity >= 0.80
+#   best_f1         set A, highest val F1; every label on set A is flagged low_reliability
+#   score_only      no threshold; the viewer shows the score only
+# low_reliability: the viewer flags the label's result as low reliability.
+#
+# Measured on the official test split (results_v2.md): set B gave test specificity below 0.40
+# for Infiltration, Pneumonia and Nodule, and test sensitivity 0.749 for Cardiomegaly (below
+# the 0.80 reached on val). Hernia had 10 val positives, too few for set B.
+
+source: reports/thresholds_v2.json
+labels:
+  Atelectasis:
+    set: best_f1
+    threshold: 0.20705434679985046
+    low_reliability: true
+  Cardiomegaly:
+    set: sensitivity_80
+    threshold: 0.024798160418868065
+    low_reliability: false
+  Consolidation:
+    set: best_f1
+    threshold: 0.07423137128353119
+    low_reliability: true
+  Edema:
+    set: sensitivity_80
+    threshold: 0.030675802379846573
+    low_reliability: false
+  Effusion:
+    set: sensitivity_80
+    threshold: 0.08050192147493362
+    low_reliability: false
+  Emphysema:
+    set: sensitivity_80
+    threshold: 0.0067449891939759254
+    low_reliability: false
+  Fibrosis:
+    set: sensitivity_80
+    threshold: 0.00955939944833517
+    low_reliability: false
+  Hernia:
+    set: score_only
+    threshold: null
+    low_reliability: false
+  Infiltration:
+    set: best_f1
+    threshold: 0.24310296773910522
+    low_reliability: true
+  Mass:
+    set: sensitivity_80
+    threshold: 0.03191915154457092
+    low_reliability: false
+  Nodule:
+    set: best_f1
+    threshold: 0.1792430430650711
+    low_reliability: true
+  Pleural_Thickening:
+    set: best_f1
+    threshold: 0.07935289293527603
+    low_reliability: true
+  Pneumonia:
+    set: best_f1
+    threshold: 0.038901980966329575
+    low_reliability: true
+  Pneumothorax:
+    set: sensitivity_80
+    threshold: 0.019946934655308723
+    low_reliability: false
