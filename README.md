@@ -303,6 +303,33 @@ output channels (background, spleen). The fixed config is in `configs/segmentati
 Run `notebooks/colab_seg.ipynb` on a GPU runtime. It downloads the data to the VM disk, rebuilds
 `seg_split` and stops if `dvc.lock` changes, then trains and evaluates.
 
+## Orthanc and the results database
+
+`docker-compose.yml` runs two services, for synthetic or public de-identified data only:
+
+- **Orthanc** (`orthancteam/orthanc:26.9.1`):
+  - REST API and web UI on `127.0.0.1:8042`, with basic auth on.
+  - DICOM on `127.0.0.1:4242`. The DICOM protocol itself has no password, so the port is bound
+    to localhost only.
+  - A study becomes `StableStudy` 5 s after its last instance arrives.
+- **Results Postgres** (`postgres:16.14`) on `127.0.0.1:5434`, separate from the AIML-01 database
+  on 5432. Port 5433 is taken by a local PostgreSQL 18 service on the development machine. The
+  port is `RESULTS_DB_PORT` in `.env`.
+
+```
+cp .env.example .env              # then set both passwords; .env is never committed
+docker compose up -d --wait
+python -m scripts.upload_demo     # 2 NIH demo PNGs as DX, MSD spleen_14 as a CT series
+```
+
+`scripts/upload_demo.py` converts the files with `src/dicom/convert.py`: no names or dates, and
+UIDs derived from the source. A rerun therefore reports `AlreadyStored` instead of duplicating.
+It then checks that each study can be found in Orthanc.
+
+`tests/test_orthanc_integration.py` uploads synthetic DX and CT studies, finds them, and checks
+that a wrong password is refused. It runs in the CI job `integration`, or locally with
+`AIML02_INTEGRATION=1 python -m pytest -m integration` once the services are up.
+
 ## Checks
 
 ```powershell
