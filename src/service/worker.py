@@ -29,7 +29,7 @@ from pathlib import Path
 import torch
 
 from src.service.analyzers import Analyzer, ClassifierAnalyzer, Reader, SegmentationAnalyzer
-from src.service.orthanc import Orthanc, load_env
+from src.service.orthanc import Orthanc, OrthancError, load_env
 from src.service.store import PostgresStore, Result, Store
 
 Log = Callable[[str], None]
@@ -62,7 +62,14 @@ class Worker:
 
     def process_study(self, orthanc_id: str) -> list[str]:
         """Run every analyzer whose modality is in the study; returns the outcomes."""
-        study = self.orthanc.get_json(f"/studies/{orthanc_id}")
+        try:
+            study = self.orthanc.get_json(f"/studies/{orthanc_id}")
+        except OrthancError as error:
+            if error.status != 404:
+                raise
+            # Deleted since it became stable (e.g. scripts/reset_demo.py): nothing to do.
+            self.log(f"study {orthanc_id} is no longer in Orthanc, skipped")
+            return ["gone"]
         study_uid = str(study["MainDicomTags"]["StudyInstanceUID"])
         series = self.orthanc.get_json(f"/studies/{orthanc_id}/series")
         outcomes = []

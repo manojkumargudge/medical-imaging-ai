@@ -24,6 +24,7 @@ from src.dicom import convert
 from src.explain import gradcam
 from src.models.segmentation import load_seg_config
 from src.service.analyzers import ClassifierAnalyzer, SegmentationAnalyzer, to_png
+from src.service.orthanc import OrthancError
 from src.service.store import MemoryStore
 from src.service.worker import Worker
 
@@ -94,6 +95,8 @@ class FakeOrthanc:
             since, limit = int(query["since"][0]), int(query["limit"][0])
             batch = [c for c in self.changes if c["Seq"] > since][:limit]
             return {"Changes": batch, "Done": True, "Last": batch[-1]["Seq"] if batch else since}
+        if parts[1] not in self.studies:
+            raise OrthancError(404, path, "Unknown resource")
         first = self._ds(self.studies[parts[1]][0])
         if len(parts) == 2:
             return {"MainDicomTags": {"StudyInstanceUID": str(first.StudyInstanceUID)}}
@@ -282,3 +285,15 @@ def test_checkpoints_stay_out_of_the_image_and_git() -> None:
         ["git", "ls-files", "*.pt", "*.pth"], cwd=REPO_ROOT, capture_output=True, text=True
     )
     assert tracked.stdout == ""
+
+
+def test_a_deleted_study_is_skipped_and_the_seq_advances(tmp_path: Path) -> None:
+    orthanc, store = FakeOrthanc(), MemoryStore()
+    orthanc.add_study("gone", [dx(11)])
+    orthanc.add_study("kept", [dx(12)])
+    del orthanc.studies["gone"]  # deleted after it became stable
+    worker = make_worker(orthanc, store, tmp_path)
+    assert worker.process_study("gone") == ["gone"]
+    worker.poll_once()
+    assert [row["orthanc_study_id"] for row in store.rows] == ["kept"]
+    assert store.last_seq() == 2

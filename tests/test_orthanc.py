@@ -126,7 +126,8 @@ def test_env_file_does_not_replace_set_variables(
 def test_compose_binds_localhost_and_keeps_secrets_out() -> None:
     root = Path(__file__).resolve().parents[1]
     compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
-    assert '"127.0.0.1:8042:8042"' in compose and '"127.0.0.1:4242:4242"' in compose
+    assert '"127.0.0.1:${ORTHANC_HTTP_PORT:-8042}:8042"' in compose
+    assert '"127.0.0.1:${ORTHANC_DICOM_PORT:-4242}:4242"' in compose
     assert '"127.0.0.1:${RESULTS_DB_PORT:-5434}:5432"' in compose
     assert 'ORTHANC__AUTHENTICATION_ENABLED: "true"' in compose
     assert "change-me" not in compose

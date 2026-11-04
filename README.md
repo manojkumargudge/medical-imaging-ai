@@ -327,8 +327,40 @@ UIDs derived from the source. A rerun therefore reports `AlreadyStored` instead 
 It then checks that each study can be found in Orthanc.
 
 `tests/test_orthanc_integration.py` uploads synthetic DX and CT studies, finds them, and checks
-that a wrong password is refused. It runs in the CI job `integration`, or locally with
-`AIML02_INTEGRATION=1 python -m pytest -m integration` once the services are up.
+that a wrong password is refused.
+
+**Integration tests never use the demo stack.** They run against a separate Compose project,
+`aiml02-test`, configured by `.env.test`:
+
+| setting | demo stack | test stack |
+|---|---|---|
+| ports | 8042, 4242, 5434 | 18042, 14242, 15434 |
+| Docker volumes | `aiml02_*` | `aiml02-test_*` |
+| Orthanc name | `aiml02` | `aiml02-test` |
+| database | `aiml02_results` | `aiml02_results_test` |
+
+The tests read only `.env.test`, and they check the Orthanc name and the database name before
+doing anything.
+
+```
+python -m scripts.make_test_env                               # writes .env.test, never overwrites
+docker compose -p aiml02-test --env-file .env.test up -d --wait
+AIML02_INTEGRATION=1 python -m pytest -m integration
+```
+
+The CI job `integration` does the same.
+
+**Resetting the demo.** `scripts/reset_demo.py` returns the demo stack to the three demo studies
+only. It deletes:
+
+- every study in the demo Orthanc
+- every row of `inference_results`
+- the worker's output files under `results/`
+
+It then re-uploads with `upload_demo.py`. It shows the counts and asks you to type `wipe` before
+deleting anything. It checks that it is on the demo stack by Orthanc name and database name, and
+it keeps the worker's change-log position. Stop the worker before running it, and start it again
+afterwards.
 
 ## Inference worker
 
@@ -355,8 +387,29 @@ Results go to the Postgres table `inference_results`:
   that row to retry it.
 
 The worker runs CPU only. The image (`Dockerfile`) holds code and configs only. The checkpoints
-are files on this machine, set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in
-`.env` and mounted read-only. They are never in the image or in git, and a test checks both.
+are files on this machine, kept in `C:\aiml02-checkpoints\` (outside the repository):
+
+- `epoch_003.pt`: the classifier, sha256 `1a35108e…501708`
+- `epoch_180.pt`: the U-Net, sha256 `8839d537…26cc36`
+
+They are set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in `.env` and mounted
+read-only. They are never in the image or in git, and a test checks both. The worker logs each
+checkpoint's sha256 at start-up, and every result row records it.
+
+Worker time per study on CPU, from the `seconds` column, one run each after
+`scripts/reset_demo.py`:
+
+| study | model | time |
+|---|---|---|
+| DX 00000116_000 (1 image) | classifier + Grad-CAM for 14 labels | 24.2 s |
+| DX 00000013_021 (1 image) | classifier + Grad-CAM for 14 labels | 16.2 s |
+| CT spleen_14 (54 slices) | U-Net, sliding window | 58.5 s |
+
+- **Machine:** Intel Core i5-1235U laptop, Docker Desktop VM with 12 CPUs and 10 GB.
+- **Threads:** the worker uses `WORKER_THREADS=4`.
+- **What is timed:** download from Orthanc, inference and writing outputs.
+- **First DX study:** it includes first-call overhead, so it is slower than the second.
+- **Grad-CAM:** most of the DX time. It runs one forward and backward pass per label.
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.worker.yml up -d --build

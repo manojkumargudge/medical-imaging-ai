@@ -2,7 +2,8 @@
 
 Credentials come from the environment (ORTHANC_URL, ORTHANC_USER, ORTHANC_PASSWORD). `load_env`
 reads a .env file into missing variables, so the scripts work with the same .env as Docker
-Compose. Never commit .env; .env.example lists the names.
+Compose; `read_env` reads a file (such as .env.test) without touching the environment. Never
+commit .env or .env.test; .env.example lists the names.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,16 +21,23 @@ from typing import Any
 DEFAULT_URL = "http://127.0.0.1:8042"
 
 
-def load_env(path: Path = Path(".env")) -> None:
-    """Set variables from a KEY=value file, without replacing ones already set."""
-    if not path.exists():
-        return
+def read_env(path: Path) -> dict[str, str]:
+    """KEY=value pairs from a file, without touching the process environment."""
+    values: dict[str, str] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+        values[key.strip()] = value.strip().strip("'\"")
+    return values
+
+
+def load_env(path: Path = Path(".env")) -> None:
+    """Set variables from a KEY=value file, without replacing ones already set."""
+    if path.exists():
+        for key, value in read_env(path).items():
+            os.environ.setdefault(key, value)
 
 
 class OrthancError(RuntimeError):
@@ -46,10 +55,20 @@ class Orthanc:
 
     @classmethod
     def from_env(cls) -> Orthanc:
-        user, password = os.environ.get("ORTHANC_USER"), os.environ.get("ORTHANC_PASSWORD")
+        return cls.from_values(os.environ)
+
+    @classmethod
+    def from_values(cls, values: Mapping[str, str]) -> Orthanc:
+        user, password = values.get("ORTHANC_USER"), values.get("ORTHANC_PASSWORD")
         if not user or not password:
             raise ValueError("set ORTHANC_USER and ORTHANC_PASSWORD (see .env.example)")
-        return cls(os.environ.get("ORTHANC_URL", DEFAULT_URL).rstrip("/"), user, password)
+        return cls(values.get("ORTHANC_URL", DEFAULT_URL).rstrip("/"), user, password)
+
+    def require_name(self, expected: str) -> None:
+        """Refuse to go on unless this Orthanc has the expected Name (demo vs test stack)."""
+        name = self.get_json("/system")["Name"]
+        if name != expected:
+            raise RuntimeError(f"{self.url} is Orthanc {name!r}, expected {expected!r}")
 
     def _request(
         self, method: str, path: str, data: bytes | None = None, content_type: str = ""
@@ -71,6 +90,9 @@ class Orthanc:
 
     def get_bytes(self, path: str) -> bytes:
         return self._request("GET", path)
+
+    def delete(self, path: str) -> None:
+        self._request("DELETE", path)
 
     def post_json(self, path: str, payload: Any) -> Any:
         body = json.dumps(payload).encode()
