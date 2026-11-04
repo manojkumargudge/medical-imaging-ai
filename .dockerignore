@@ -1,0 +1,8 @@
+*
+!pyproject.toml
+!params.yaml
+!src/
+!configs/
+**/__pycache__
+**/*.pt
+**/*.pth

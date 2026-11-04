@@ -330,6 +330,50 @@ It then checks that each study can be found in Orthanc.
 that a wrong password is refused. It runs in the CI job `integration`, or locally with
 `AIML02_INTEGRATION=1 python -m pytest -m integration` once the services are up.
 
+## Inference worker
+
+`src/service/worker.py` polls Orthanc's `/changes` for `StableStudy` events and stores the last
+change sequence in the results database, so a restart resumes where it stopped. For each study:
+
+- **DX/CR series:** the DenseNet121 classifier with Grad-CAM (all 14 labels). It records:
+  - scores, which are not calibrated probabilities
+  - the threshold, its set and the reliability flag from `configs/viewer_thresholds.yaml`
+  - one overlay PNG per label
+  The 8-bit MONOCHROME2 images converted from NIH PNGs go through unchanged. Other DX images are
+  windowed and scaled to 8 bits, which differs from the training data.
+- **CT series:** the 3D U-Net with the evaluation transforms and sliding-window inference. It
+  records the spleen mask as NIfTI in the model's space (RAS, 1.5 mm, body crop, with its
+  affine) and the spleen volume.
+
+Results go to the Postgres table `inference_results`:
+
+- **Key:** one row per (StudyInstanceUID, checkpoint sha256), so reruns and repeated
+  `StableStudy` events add nothing.
+- **Columns:** model, checkpoint name and hash, status, results JSON, seconds, and created_at.
+  Output paths in the results JSON are relative to `RESULTS_DIR`.
+- **Errors:** a study that fails is stored with status `error`, and the worker moves on. Delete
+  that row to retry it.
+
+The worker runs CPU only. The image (`Dockerfile`) holds code and configs only. The checkpoints
+are files on this machine, set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in
+`.env` and mounted read-only. They are never in the image or in git, and a test checks both.
+
+```
+docker compose -f docker-compose.yml -f docker-compose.worker.yml up -d --build
+python -m scripts.upload_demo
+python -m scripts.check_worker    # real checks against the published outputs
+```
+
+Tests:
+
+- `tests/test_worker.py` runs the worker with fake models and an in-memory Orthanc.
+- `tests/test_worker_integration.py` runs it against the real services, using temporary tables
+  (CI job `integration`).
+- `scripts/check_worker.py` compares the worker on the real demo studies with the published
+  outputs:
+  - DX: scores must equal the Grad-CAM JSON scores within 1e-6.
+  - CT: Dice on `spleen_14` must match `segmentation_metrics.json` within 0.005.
+
 ## Checks
 
 ```powershell
