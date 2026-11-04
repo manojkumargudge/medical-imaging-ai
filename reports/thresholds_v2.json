@@ -1,0 +1,167 @@
+{
+  "selected_on": "val",
+  "sets": {
+    "best_f1": {
+      "rule": "highest F1 per label; predict positive when score >= threshold",
+      "labels": {
+        "Atelectasis": {
+          "threshold": 0.20705434679985046,
+          "f1": 0.3684210526315789,
+          "precision": 0.29441624365482233,
+          "recall": 0.4921212121212121
+        },
+        "Cardiomegaly": {
+          "threshold": 0.1536761373281479,
+          "f1": 0.38631790744466804,
+          "precision": 0.3287671232876712,
+          "recall": 0.4682926829268293
+        },
+        "Consolidation": {
+          "threshold": 0.07423137128353119,
+          "f1": 0.23442732752846618,
+          "precision": 0.14957264957264957,
+          "recall": 0.541795665634675
+        },
+        "Edema": {
+          "threshold": 0.15960998833179474,
+          "f1": 0.23660714285714282,
+          "precision": 0.16307692307692306,
+          "recall": 0.43089430894308944
+        },
+        "Effusion": {
+          "threshold": 0.18506188690662384,
+          "f1": 0.5465382851902797,
+          "precision": 0.48613376835236544,
+          "recall": 0.6240837696335079
+        },
+        "Emphysema": {
+          "threshold": 0.1919327825307846,
+          "f1": 0.38174273858921165,
+          "precision": 0.3770491803278688,
+          "recall": 0.3865546218487395
+        },
+        "Fibrosis": {
+          "threshold": 0.09568694233894348,
+          "f1": 0.13970588235294118,
+          "precision": 0.11377245508982035,
+          "recall": 0.18095238095238095
+        },
+        "Hernia": {
+          "threshold": 0.014559517614543438,
+          "f1": 0.4,
+          "precision": 0.6,
+          "recall": 0.3
+        },
+        "Infiltration": {
+          "threshold": 0.24310296773910522,
+          "f1": 0.38899196042053186,
+          "precision": 0.36045845272206306,
+          "recall": 0.42243116185359303
+        },
+        "Mass": {
+          "threshold": 0.18653921782970428,
+          "f1": 0.38739789964994165,
+          "precision": 0.3688888888888889,
+          "recall": 0.40786240786240785
+        },
+        "Nodule": {
+          "threshold": 0.1792430430650711,
+          "f1": 0.32819582955575705,
+          "precision": 0.3142361111111111,
+          "recall": 0.34345351043643263
+        },
+        "Pleural_Thickening": {
+          "threshold": 0.07935289293527603,
+          "f1": 0.20738137082601055,
+          "precision": 0.17352941176470588,
+          "recall": 0.2576419213973799
+        },
+        "Pneumonia": {
+          "threshold": 0.038901980966329575,
+          "f1": 0.08212560386473429,
+          "precision": 0.0513595166163142,
+          "recall": 0.20481927710843373
+        },
+        "Pneumothorax": {
+          "threshold": 0.09894659370183945,
+          "f1": 0.32426035502958583,
+          "precision": 0.2560747663551402,
+          "recall": 0.44193548387096776
+        }
+      }
+    },
+    "sensitivity_80": {
+      "rule": "highest threshold with val sensitivity >= 0.80; labels with fewer than 30 val positives get no threshold (score only)",
+      "target_sensitivity": 0.8,
+      "min_val_positives": 30,
+      "labels": {
+        "Atelectasis": {
+          "threshold": 0.07382971793413162,
+          "sensitivity": 0.8,
+          "specificity": 0.6712415008813901
+        },
+        "Cardiomegaly": {
+          "threshold": 0.024798160418868065,
+          "sensitivity": 0.8,
+          "specificity": 0.8876430740481196
+        },
+        "Consolidation": {
+          "threshold": 0.03481519594788551,
+          "sensitivity": 0.8018575851393189,
+          "specificity": 0.7423022264329702
+        },
+        "Edema": {
+          "threshold": 0.030675802379846573,
+          "sensitivity": 0.8048780487804879,
+          "specificity": 0.8516890328551596
+        },
+        "Effusion": {
+          "threshold": 0.08050192147493362,
+          "sensitivity": 0.8,
+          "specificity": 0.8323092677931387
+        },
+        "Emphysema": {
+          "threshold": 0.0067449891939759254,
+          "sensitivity": 0.8067226890756303,
+          "specificity": 0.7638760407030527
+        },
+        "Fibrosis": {
+          "threshold": 0.00955939944833517,
+          "sensitivity": 0.8,
+          "specificity": 0.6396906026321866
+        },
+        "Hernia": null,
+        "Infiltration": {
+          "threshold": 0.10212548077106476,
+          "sensitivity": 0.8005372733378107,
+          "specificity": 0.4649629018961253
+        },
+        "Mass": {
+          "threshold": 0.03191915154457092,
+          "sensitivity": 0.8034398034398035,
+          "specificity": 0.7618421052631579
+        },
+        "Nodule": {
+          "threshold": 0.03271312639117241,
+          "sensitivity": 0.8007590132827325,
+          "specificity": 0.5598300970873786
+        },
+        "Pleural_Thickening": {
+          "threshold": 0.01353214867413044,
+          "sensitivity": 0.8034934497816594,
+          "specificity": 0.6861091590536426
+        },
+        "Pneumonia": {
+          "threshold": 0.004331501666456461,
+          "sensitivity": 0.8072289156626506,
+          "specificity": 0.507945647167204
+        },
+        "Pneumothorax": {
+          "threshold": 0.019946934655308723,
+          "sensitivity": 0.8,
+          "specificity": 0.7741515903984865
+        }
+      }
+    }
+  }
+}

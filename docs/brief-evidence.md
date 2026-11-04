@@ -27,3 +27,34 @@ The Requirement column is copied word for word from [brief.md](brief.md).
 | Deliverable 4 | Test results and, where relevant, performance or accuracy numbers | Partial | Test results: ruff, mypy (strict) and pytest pass in CI on every PR (178 passed, 3 real-data tests skipped in CI, as of PR #6). Missing: no accuracy numbers, because no model is trained. |
 | Deliverable 5 | 10-minute final presentation covering problem, design, challenges, results, and next steps | No | |
 | Deliverable 6 | Individual reflection from each intern on what they learned and what they owned | No | |
+
+## Limitations
+
+### Classifier
+
+**For education only, not for clinical use.** All numbers come from the DenseNet121 classifier
+(checkpoint epoch 3) on NIH ChestX-ray14. The labels were NLP-mined from reports and were not
+verified by radiologists. Numbers are for the official `test_list.txt` split unless the val
+split is named. Intervals are 95% bootstrap intervals (1000 patient-level resamples). Source:
+[results_v2.md](results_v2.md) and `reports/classifier_metrics_v2.json`.
+
+- **Overall:** mean test AUROC is 0.804 (0.797-0.810). This measures agreement with NLP-mined
+  labels, not clinical accuracy.
+- **Hernia:** the test AUROC interval is wide (0.808-0.922), and val has only 10 positives. Too
+  few for a sensitivity-based threshold, so the viewer shows the score only.
+- **Sex and age:** no evidence of a sex or age gap on test, because the intervals overlap.
+  This does not show that there is no gap.
+  - Sex: F 0.802 (0.791-0.811), M 0.804 (0.796-0.812).
+  - Age bands: compared over the 8 labels with at least 10 positives in every band.
+  - On val, only 1 label (Effusion) has at least 10 positives in every age band, so the val
+    age comparison is not reportable.
+- **Thresholds that did not work on test:**
+  - For Infiltration, Pneumonia and Nodule, the threshold reaching val sensitivity >= 0.80 gives
+    test specificity below 0.40: 0.234, 0.271 and 0.363. No single threshold is usable for
+    these labels. The viewer uses the highest-F1 threshold and flags them as low reliability,
+    as it does for Atelectasis, Pleural_Thickening and Consolidation.
+  - For Cardiomegaly, the val sensitivity-0.80 threshold gives test sensitivity 0.749: the
+    threshold did not transfer from val to test.
+- **Scores:** the scores are not calibrated probabilities. A threshold is a cut-off on the
+  model's score; a score of 0.3 does not mean a 30% chance of the finding. Viewer thresholds:
+  `configs/viewer_thresholds.yaml`.

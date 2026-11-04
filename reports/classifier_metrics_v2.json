@@ -1,0 +1,2550 @@
+{
+  "notice": "For education only, not for clinical use.",
+  "report_version": 2,
+  "dataset": "NIH ChestX-ray14 (Kaggle nih-chest-xrays/data)",
+  "labels_note": "NLP-mined from radiology reports, not radiologist-verified",
+  "repo_commit": "30c5b9873717a0658ee9238bad18001736cf9fee",
+  "checkpoint_epoch": 3,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.1516306575714506,
+      "train_images": 77757,
+      "val_images": 8767,
+      "val_mean_auroc": 0.8017021711242733,
+      "val_auroc": {
+        "Atelectasis": 0.7807879856230397,
+        "Cardiomegaly": 0.8771226804769799,
+        "Consolidation": 0.8156033998530475,
+        "Edema": 0.8900656689352642,
+        "Effusion": 0.8798998989338459,
+        "Emphysema": 0.8613673730361711,
+        "Fibrosis": 0.7804433156314939,
+        "Hernia": 0.7765216398309923,
+        "Infiltration": 0.6859756654598685,
+        "Mass": 0.8105252871401197,
+        "Nodule": 0.7472641209631363,
+        "Pleural_Thickening": 0.7846976936398387,
+        "Pneumonia": 0.7035671474474592,
+        "Pneumothorax": 0.8299885187685713
+      },
+      "seconds": 436.3
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.131552519902315,
+      "train_images": 77757,
+      "val_images": 8767,
+      "val_mean_auroc": 0.8196009732183599,
+      "val_auroc": {
+        "Atelectasis": 0.7969679418206238,
+        "Cardiomegaly": 0.9019145857190878,
+        "Consolidation": 0.8343288436070532,
+        "Edema": 0.912474182006975,
+        "Effusion": 0.8908799859526089,
+        "Emphysema": 0.8807054042708664,
+        "Fibrosis": 0.783370166353311,
+        "Hernia": 0.8011876213315063,
+        "Infiltration": 0.7054391820127854,
+        "Mass": 0.8337649741955961,
+        "Nodule": 0.7661494123173854,
+        "Pleural_Thickening": 0.808443833424884,
+        "Pneumonia": 0.7145456538267303,
+        "Pneumothorax": 0.8442418382176247
+      },
+      "seconds": 436.3
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.12719352210077167,
+      "train_images": 77757,
+      "val_images": 8767,
+      "val_mean_auroc": 0.8265723720980482,
+      "val_auroc": {
+        "Atelectasis": 0.8074319879734133,
+        "Cardiomegaly": 0.9177702383190615,
+        "Consolidation": 0.8327887389217323,
+        "Edema": 0.9047466544771879,
+        "Effusion": 0.8849564235985449,
+        "Emphysema": 0.887782865227497,
+        "Fibrosis": 0.8025161900363932,
+        "Hernia": 0.8042080621217311,
+        "Infiltration": 0.7059989340166257,
+        "Mass": 0.8590713647531829,
+        "Nodule": 0.7662395681730256,
+        "Pleural_Thickening": 0.8125623337128338,
+        "Pneumonia": 0.7263198348437508,
+        "Pneumothorax": 0.8596200131976945
+      },
+      "seconds": 436.2
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.12347185741578459,
+      "train_images": 77757,
+      "val_images": 8767,
+      "val_mean_auroc": 0.823916306330431,
+      "val_auroc": {
+        "Atelectasis": 0.8125744984470747,
+        "Cardiomegaly": 0.9160148928048496,
+        "Consolidation": 0.828605835861982,
+        "Edema": 0.9056509896427053,
+        "Effusion": 0.8829039362184101,
+        "Emphysema": 0.8968217259151579,
+        "Fibrosis": 0.8062539169442886,
+        "Hernia": 0.7952495146739751,
+        "Infiltration": 0.7027905104595005,
+        "Mass": 0.8540173165771252,
+        "Nodule": 0.7752268289088263,
+        "Pleural_Thickening": 0.7984466566625853,
+        "Pneumonia": 0.7132297037065813,
+        "Pneumothorax": 0.8470419618029729
+      },
+      "seconds": 433.4
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.11951640946721706,
+      "train_images": 77757,
+      "val_images": 8767,
+      "val_mean_auroc": 0.820929417853273,
+      "val_auroc": {
+        "Atelectasis": 0.8139896064650535,
+        "Cardiomegaly": 0.9027033802223097,
+        "Consolidation": 0.8313382796585187,
+        "Edema": 0.9036349288758968,
+        "Effusion": 0.8884399889551047,
+        "Emphysema": 0.8911843414516593,
+        "Fibrosis": 0.7823152026915593,
+        "Hernia": 0.7785771382893686,
+        "Infiltration": 0.708185897829849,
+        "Mass": 0.8449034833006125,
+        "Nodule": 0.7650633969528933,
+        "Pleural_Thickening": 0.8056812032720915,
+        "Pneumonia": 0.7184719994672379,
+        "Pneumothorax": 0.858523002513665
+      },
+      "seconds": 430.7
+    }
+  ],
+  "train_versions": {
+    "torch": "2.11.0+cu130",
+    "torchvision": "0.26.0+cu130"
+  },
+  "eval_versions": {
+    "torch": "2.11.0+cu130",
+    "torchvision": "0.26.0+cu130"
+  },
+  "thresholds": {
+    "selected_on": "val",
+    "sets": {
+      "best_f1": {
+        "rule": "highest F1 per label; predict positive when score >= threshold",
+        "labels": {
+          "Atelectasis": {
+            "threshold": 0.20705434679985046,
+            "f1": 0.3684210526315789,
+            "precision": 0.29441624365482233,
+            "recall": 0.4921212121212121
+          },
+          "Cardiomegaly": {
+            "threshold": 0.1536761373281479,
+            "f1": 0.38631790744466804,
+            "precision": 0.3287671232876712,
+            "recall": 0.4682926829268293
+          },
+          "Consolidation": {
+            "threshold": 0.07423137128353119,
+            "f1": 0.23442732752846618,
+            "precision": 0.14957264957264957,
+            "recall": 0.541795665634675
+          },
+          "Edema": {
+            "threshold": 0.15960998833179474,
+            "f1": 0.23660714285714282,
+            "precision": 0.16307692307692306,
+            "recall": 0.43089430894308944
+          },
+          "Effusion": {
+            "threshold": 0.18506188690662384,
+            "f1": 0.5465382851902797,
+            "precision": 0.48613376835236544,
+            "recall": 0.6240837696335079
+          },
+          "Emphysema": {
+            "threshold": 0.1919327825307846,
+            "f1": 0.38174273858921165,
+            "precision": 0.3770491803278688,
+            "recall": 0.3865546218487395
+          },
+          "Fibrosis": {
+            "threshold": 0.09568694233894348,
+            "f1": 0.13970588235294118,
+            "precision": 0.11377245508982035,
+            "recall": 0.18095238095238095
+          },
+          "Hernia": {
+            "threshold": 0.014559517614543438,
+            "f1": 0.4,
+            "precision": 0.6,
+            "recall": 0.3
+          },
+          "Infiltration": {
+            "threshold": 0.24310296773910522,
+            "f1": 0.38899196042053186,
+            "precision": 0.36045845272206306,
+            "recall": 0.42243116185359303
+          },
+          "Mass": {
+            "threshold": 0.18653921782970428,
+            "f1": 0.38739789964994165,
+            "precision": 0.3688888888888889,
+            "recall": 0.40786240786240785
+          },
+          "Nodule": {
+            "threshold": 0.1792430430650711,
+            "f1": 0.32819582955575705,
+            "precision": 0.3142361111111111,
+            "recall": 0.34345351043643263
+          },
+          "Pleural_Thickening": {
+            "threshold": 0.07935289293527603,
+            "f1": 0.20738137082601055,
+            "precision": 0.17352941176470588,
+            "recall": 0.2576419213973799
+          },
+          "Pneumonia": {
+            "threshold": 0.038901980966329575,
+            "f1": 0.08212560386473429,
+            "precision": 0.0513595166163142,
+            "recall": 0.20481927710843373
+          },
+          "Pneumothorax": {
+            "threshold": 0.09894659370183945,
+            "f1": 0.32426035502958583,
+            "precision": 0.2560747663551402,
+            "recall": 0.44193548387096776
+          }
+        }
+      },
+      "sensitivity_80": {
+        "rule": "highest threshold with val sensitivity >= 0.80; labels with fewer than 30 val positives get no threshold (score only)",
+        "target_sensitivity": 0.8,
+        "min_val_positives": 30,
+        "labels": {
+          "Atelectasis": {
+            "threshold": 0.07382971793413162,
+            "sensitivity": 0.8,
+            "specificity": 0.6712415008813901
+          },
+          "Cardiomegaly": {
+            "threshold": 0.024798160418868065,
+            "sensitivity": 0.8,
+            "specificity": 0.8876430740481196
+          },
+          "Consolidation": {
+            "threshold": 0.03481519594788551,
+            "sensitivity": 0.8018575851393189,
+            "specificity": 0.7423022264329702
+          },
+          "Edema": {
+            "threshold": 0.030675802379846573,
+            "sensitivity": 0.8048780487804879,
+            "specificity": 0.8516890328551596
+          },
+          "Effusion": {
+            "threshold": 0.08050192147493362,
+            "sensitivity": 0.8,
+            "specificity": 0.8323092677931387
+          },
+          "Emphysema": {
+            "threshold": 0.0067449891939759254,
+            "sensitivity": 0.8067226890756303,
+            "specificity": 0.7638760407030527
+          },
+          "Fibrosis": {
+            "threshold": 0.00955939944833517,
+            "sensitivity": 0.8,
+            "specificity": 0.6396906026321866
+          },
+          "Hernia": null,
+          "Infiltration": {
+            "threshold": 0.10212548077106476,
+            "sensitivity": 0.8005372733378107,
+            "specificity": 0.4649629018961253
+          },
+          "Mass": {
+            "threshold": 0.03191915154457092,
+            "sensitivity": 0.8034398034398035,
+            "specificity": 0.7618421052631579
+          },
+          "Nodule": {
+            "threshold": 0.03271312639117241,
+            "sensitivity": 0.8007590132827325,
+            "specificity": 0.5598300970873786
+          },
+          "Pleural_Thickening": {
+            "threshold": 0.01353214867413044,
+            "sensitivity": 0.8034934497816594,
+            "specificity": 0.6861091590536426
+          },
+          "Pneumonia": {
+            "threshold": 0.004331501666456461,
+            "sensitivity": 0.8072289156626506,
+            "specificity": 0.507945647167204
+          },
+          "Pneumothorax": {
+            "threshold": 0.019946934655308723,
+            "sensitivity": 0.8,
+            "specificity": 0.7741515903984865
+          }
+        }
+      }
+    }
+  },
+  "bootstrap": {
+    "split": "test",
+    "resamples": 1000,
+    "seed": 42,
+    "level": 0.95,
+    "unit": "patient (all images of a drawn patient are kept together)",
+    "method": "percentile"
+  },
+  "subgroup_min_positives": 10,
+  "splits": {
+    "val": {
+      "name": "val (10% of train_val_list.txt patients, seed 42)",
+      "images": 8767,
+      "patients": 2801,
+      "mean_auroc": 0.8265723720980482,
+      "labels": [
+        {
+          "label": "Atelectasis",
+          "auroc": 0.8074319879734133,
+          "positives": 825,
+          "negatives": 7942,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 406,
+              "fp": 973,
+              "fn": 419,
+              "tn": 6969,
+              "precision": 0.29441624365482233,
+              "sensitivity": 0.4921212121212121,
+              "specificity": 0.877486779148829,
+              "f1": 0.3684210526315789
+            },
+            "sensitivity_80": {
+              "tp": 660,
+              "fp": 2611,
+              "fn": 165,
+              "tn": 5331,
+              "precision": 0.20177315805564047,
+              "sensitivity": 0.8,
+              "specificity": 0.6712415008813901,
+              "f1": 0.322265625
+            }
+          }
+        },
+        {
+          "label": "Cardiomegaly",
+          "auroc": 0.9177702383190615,
+          "positives": 205,
+          "negatives": 8562,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 96,
+              "fp": 196,
+              "fn": 109,
+              "tn": 8366,
+              "precision": 0.3287671232876712,
+              "sensitivity": 0.4682926829268293,
+              "specificity": 0.9771081523008642,
+              "f1": 0.386317907444668
+            },
+            "sensitivity_80": {
+              "tp": 164,
+              "fp": 962,
+              "fn": 41,
+              "tn": 7600,
+              "precision": 0.14564831261101244,
+              "sensitivity": 0.8,
+              "specificity": 0.8876430740481196,
+              "f1": 0.2464312546957175
+            }
+          }
+        },
+        {
+          "label": "Consolidation",
+          "auroc": 0.8327887389217323,
+          "positives": 323,
+          "negatives": 8444,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 175,
+              "fp": 995,
+              "fn": 148,
+              "tn": 7449,
+              "precision": 0.14957264957264957,
+              "sensitivity": 0.541795665634675,
+              "specificity": 0.8821648507816201,
+              "f1": 0.23442732752846618
+            },
+            "sensitivity_80": {
+              "tp": 259,
+              "fp": 2176,
+              "fn": 64,
+              "tn": 6268,
+              "precision": 0.10636550308008214,
+              "sensitivity": 0.8018575851393189,
+              "specificity": 0.7423022264329702,
+              "f1": 0.18781725888324874
+            }
+          }
+        },
+        {
+          "label": "Edema",
+          "auroc": 0.9047466544771879,
+          "positives": 123,
+          "negatives": 8644,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 53,
+              "fp": 272,
+              "fn": 70,
+              "tn": 8372,
+              "precision": 0.16307692307692306,
+              "sensitivity": 0.43089430894308944,
+              "specificity": 0.968533086534012,
+              "f1": 0.23660714285714285
+            },
+            "sensitivity_80": {
+              "tp": 99,
+              "fp": 1282,
+              "fn": 24,
+              "tn": 7362,
+              "precision": 0.07168718320057929,
+              "sensitivity": 0.8048780487804879,
+              "specificity": 0.8516890328551596,
+              "f1": 0.13164893617021275
+            }
+          }
+        },
+        {
+          "label": "Effusion",
+          "auroc": 0.8849564235985449,
+          "positives": 955,
+          "negatives": 7812,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 596,
+              "fp": 630,
+              "fn": 359,
+              "tn": 7182,
+              "precision": 0.48613376835236544,
+              "sensitivity": 0.6240837696335079,
+              "specificity": 0.9193548387096774,
+              "f1": 0.5465382851902797
+            },
+            "sensitivity_80": {
+              "tp": 764,
+              "fp": 1310,
+              "fn": 191,
+              "tn": 6502,
+              "precision": 0.36837029893924783,
+              "sensitivity": 0.8,
+              "specificity": 0.8323092677931387,
+              "f1": 0.5044569164740839
+            }
+          }
+        },
+        {
+          "label": "Emphysema",
+          "auroc": 0.887782865227497,
+          "positives": 119,
+          "negatives": 8648,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 46,
+              "fp": 76,
+              "fn": 73,
+              "tn": 8572,
+              "precision": 0.3770491803278688,
+              "sensitivity": 0.3865546218487395,
+              "specificity": 0.9912118408880666,
+              "f1": 0.3817427385892116
+            },
+            "sensitivity_80": {
+              "tp": 96,
+              "fp": 2042,
+              "fn": 23,
+              "tn": 6606,
+              "precision": 0.04490177736202058,
+              "sensitivity": 0.8067226890756303,
+              "specificity": 0.7638760407030527,
+              "f1": 0.08506867523260966
+            }
+          }
+        },
+        {
+          "label": "Fibrosis",
+          "auroc": 0.8025161900363932,
+          "positives": 105,
+          "negatives": 8662,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 19,
+              "fp": 148,
+              "fn": 86,
+              "tn": 8514,
+              "precision": 0.11377245508982035,
+              "sensitivity": 0.18095238095238095,
+              "specificity": 0.98291387670284,
+              "f1": 0.13970588235294118
+            },
+            "sensitivity_80": {
+              "tp": 84,
+              "fp": 3121,
+              "fn": 21,
+              "tn": 5541,
+              "precision": 0.026209048361934478,
+              "sensitivity": 0.8,
+              "specificity": 0.6396906026321866,
+              "f1": 0.05075528700906345
+            }
+          }
+        },
+        {
+          "label": "Hernia",
+          "auroc": 0.8042080621217311,
+          "positives": 10,
+          "negatives": 8757,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 7,
+              "tn": 8755,
+              "precision": 0.6,
+              "sensitivity": 0.3,
+              "specificity": 0.9997716112824027,
+              "f1": 0.4
+            },
+            "sensitivity_80": null
+          }
+        },
+        {
+          "label": "Infiltration",
+          "auroc": 0.7059989340166257,
+          "positives": 1489,
+          "negatives": 7278,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 629,
+              "fp": 1116,
+              "fn": 860,
+              "tn": 6162,
+              "precision": 0.36045845272206306,
+              "sensitivity": 0.42243116185359303,
+              "specificity": 0.8466611706512778,
+              "f1": 0.38899196042053186
+            },
+            "sensitivity_80": {
+              "tp": 1192,
+              "fp": 3894,
+              "fn": 297,
+              "tn": 3384,
+              "precision": 0.23436885568226504,
+              "sensitivity": 0.8005372733378107,
+              "specificity": 0.4649629018961253,
+              "f1": 0.3625855513307985
+            }
+          }
+        },
+        {
+          "label": "Mass",
+          "auroc": 0.8590713647531829,
+          "positives": 407,
+          "negatives": 8360,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 166,
+              "fp": 284,
+              "fn": 241,
+              "tn": 8076,
+              "precision": 0.3688888888888889,
+              "sensitivity": 0.40786240786240785,
+              "specificity": 0.9660287081339712,
+              "f1": 0.38739789964994165
+            },
+            "sensitivity_80": {
+              "tp": 327,
+              "fp": 1991,
+              "fn": 80,
+              "tn": 6369,
+              "precision": 0.14106988783433994,
+              "sensitivity": 0.8034398034398035,
+              "specificity": 0.7618421052631579,
+              "f1": 0.24
+            }
+          }
+        },
+        {
+          "label": "Nodule",
+          "auroc": 0.7662395681730256,
+          "positives": 527,
+          "negatives": 8240,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 181,
+              "fp": 395,
+              "fn": 346,
+              "tn": 7845,
+              "precision": 0.3142361111111111,
+              "sensitivity": 0.34345351043643263,
+              "specificity": 0.9520631067961165,
+              "f1": 0.32819582955575705
+            },
+            "sensitivity_80": {
+              "tp": 422,
+              "fp": 3627,
+              "fn": 105,
+              "tn": 4613,
+              "precision": 0.10422326500370462,
+              "sensitivity": 0.8007590132827325,
+              "specificity": 0.5598300970873786,
+              "f1": 0.18444055944055945
+            }
+          }
+        },
+        {
+          "label": "Pleural_Thickening",
+          "auroc": 0.8125623337128338,
+          "positives": 229,
+          "negatives": 8538,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 59,
+              "fp": 281,
+              "fn": 170,
+              "tn": 8257,
+              "precision": 0.17352941176470588,
+              "sensitivity": 0.2576419213973799,
+              "specificity": 0.9670883110798781,
+              "f1": 0.20738137082601055
+            },
+            "sensitivity_80": {
+              "tp": 184,
+              "fp": 2680,
+              "fn": 45,
+              "tn": 5858,
+              "precision": 0.06424581005586592,
+              "sensitivity": 0.8034934497816594,
+              "specificity": 0.6861091590536426,
+              "f1": 0.11897833818299386
+            }
+          }
+        },
+        {
+          "label": "Pneumonia",
+          "auroc": 0.7263198348437508,
+          "positives": 83,
+          "negatives": 8684,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 17,
+              "fp": 314,
+              "fn": 66,
+              "tn": 8370,
+              "precision": 0.0513595166163142,
+              "sensitivity": 0.20481927710843373,
+              "specificity": 0.963841547673883,
+              "f1": 0.0821256038647343
+            },
+            "sensitivity_80": {
+              "tp": 67,
+              "fp": 4273,
+              "fn": 16,
+              "tn": 4411,
+              "precision": 0.01543778801843318,
+              "sensitivity": 0.8072289156626506,
+              "specificity": 0.507945647167204,
+              "f1": 0.03029617906398372
+            }
+          }
+        },
+        {
+          "label": "Pneumothorax",
+          "auroc": 0.8596200131976945,
+          "positives": 310,
+          "negatives": 8457,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 137,
+              "fp": 398,
+              "fn": 173,
+              "tn": 8059,
+              "precision": 0.2560747663551402,
+              "sensitivity": 0.44193548387096776,
+              "specificity": 0.9529383942296322,
+              "f1": 0.3242603550295858
+            },
+            "sensitivity_80": {
+              "tp": 248,
+              "fp": 1910,
+              "fn": 62,
+              "tn": 6547,
+              "precision": 0.11492122335495829,
+              "sensitivity": 0.8,
+              "specificity": 0.7741515903984865,
+              "f1": 0.20097244732576985
+            }
+          }
+        }
+      ],
+      "by_sex": {
+        "labels_in_mean": [
+          "Atelectasis",
+          "Cardiomegaly",
+          "Consolidation",
+          "Edema",
+          "Effusion",
+          "Emphysema",
+          "Fibrosis",
+          "Infiltration",
+          "Mass",
+          "Nodule",
+          "Pleural_Thickening",
+          "Pneumonia",
+          "Pneumothorax"
+        ],
+        "groups": {
+          "F": {
+            "images": 3814,
+            "patients": 1278,
+            "mean_auroc": 0.8230777949411414,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7997342291822256,
+                "positives": 331,
+                "negatives": 3483
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.9234569944611252,
+                "positives": 116,
+                "negatives": 3698
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8117573039660914,
+                "positives": 144,
+                "negatives": 3670
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.9187539407480756,
+                "positives": 63,
+                "negatives": 3751
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8943784690413321,
+                "positives": 440,
+                "negatives": 3374
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.8187504333957423,
+                "positives": 19,
+                "negatives": 3795
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8259760843154305,
+                "positives": 43,
+                "negatives": 3771
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8695480819758277,
+                "positives": 8,
+                "negatives": 3806
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.6958793422168355,
+                "positives": 679,
+                "negatives": 3135
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.9106146809460063,
+                "positives": 162,
+                "negatives": 3652
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7720696066889212,
+                "positives": 203,
+                "negatives": 3611
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7668231137414702,
+                "positives": 66,
+                "negatives": 3748
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7380289984566648,
+                "positives": 26,
+                "negatives": 3788
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8237881370749192,
+                "positives": 124,
+                "negatives": 3690
+              }
+            ]
+          },
+          "M": {
+            "images": 4953,
+            "patients": 1523,
+            "mean_auroc": 0.8265260753281806,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.8121235948220993,
+                "positives": 494,
+                "negatives": 4459
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.9093754620047309,
+                "positives": 89,
+                "negatives": 4864
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8489993517025416,
+                "positives": 179,
+                "negatives": 4774
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8909377341780774,
+                "positives": 60,
+                "negatives": 4893
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8771590894175194,
+                "positives": 515,
+                "negatives": 4438
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.8919606429012982,
+                "positives": 100,
+                "negatives": 4853
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.7855557607455431,
+                "positives": 62,
+                "negatives": 4891
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.5325186830943243,
+                "positives": 2,
+                "negatives": 4951
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.7135932094295598,
+                "positives": 810,
+                "negatives": 4143
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8210510117385952,
+                "positives": 245,
+                "negatives": 4708
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7636241862226596,
+                "positives": 324,
+                "negatives": 4629
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.8252186943658184,
+                "positives": 163,
+                "negatives": 4790
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7230822153422772,
+                "positives": 57,
+                "negatives": 4896
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8821580263956277,
+                "positives": 186,
+                "negatives": 4767
+              }
+            ]
+          }
+        }
+      },
+      "by_age_band": {
+        "labels_in_mean": [
+          "Effusion"
+        ],
+        "groups": {
+          "0-17": {
+            "images": 422,
+            "patients": 131,
+            "mean_auroc": 0.9191570881226054,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.8672018952355883,
+                "positives": 29,
+                "negatives": 393
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8630616088243207,
+                "positives": 9,
+                "negatives": 413
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8597481108312343,
+                "positives": 25,
+                "negatives": 397
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.9150641025641025,
+                "positives": 6,
+                "negatives": 416
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.9191570881226054,
+                "positives": 45,
+                "negatives": 377
+              },
+              {
+                "label": "Emphysema",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 422
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.7909738717339667,
+                "positives": 1,
+                "negatives": 421
+              },
+              {
+                "label": "Hernia",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 422
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.7215579710144928,
+                "positives": 92,
+                "negatives": 330
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.804212902012413,
+                "positives": 13,
+                "negatives": 409
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.6102053140096618,
+                "positives": 8,
+                "negatives": 414
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.921278140885984,
+                "positives": 17,
+                "negatives": 405
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7720352564102565,
+                "positives": 6,
+                "negatives": 416
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8619791666666667,
+                "positives": 6,
+                "negatives": 416
+              }
+            ]
+          },
+          "18-39": {
+            "images": 2269,
+            "patients": 858,
+            "mean_auroc": 0.8949264678780731,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.8325997051102241,
+                "positives": 130,
+                "negatives": 2139
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.9188083746003887,
+                "positives": 43,
+                "negatives": 2226
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8523726952199295,
+                "positives": 79,
+                "negatives": 2190
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8880877259165267,
+                "positives": 26,
+                "negatives": 2243
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8949264678780731,
+                "positives": 182,
+                "negatives": 2087
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.9213287390142862,
+                "positives": 23,
+                "negatives": 2246
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8047323277136942,
+                "positives": 15,
+                "negatives": 2254
+              },
+              {
+                "label": "Hernia",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 2269
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.6759064634787177,
+                "positives": 366,
+                "negatives": 1903
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8689257722452743,
+                "positives": 100,
+                "negatives": 2169
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7582276645811726,
+                "positives": 82,
+                "negatives": 2187
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.8184510505140814,
+                "positives": 32,
+                "negatives": 2237
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7061138283681637,
+                "positives": 20,
+                "negatives": 2249
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.867404420365696,
+                "positives": 74,
+                "negatives": 2195
+              }
+            ]
+          },
+          "40-59": {
+            "images": 4057,
+            "patients": 1280,
+            "mean_auroc": 0.8857211889132021,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7938285483490963,
+                "positives": 407,
+                "negatives": 3650
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.9305773342836778,
+                "positives": 92,
+                "negatives": 3965
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8247029521728036,
+                "positives": 138,
+                "negatives": 3919
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.918131148767441,
+                "positives": 67,
+                "negatives": 3990
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8857211889132021,
+                "positives": 457,
+                "negatives": 3600
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.8895184980434241,
+                "positives": 46,
+                "negatives": 4011
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.7990954685997249,
+                "positives": 63,
+                "negatives": 3994
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.7637956564659427,
+                "positives": 5,
+                "negatives": 4052
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.7173383976929029,
+                "positives": 672,
+                "negatives": 3385
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8638265187256101,
+                "positives": 177,
+                "negatives": 3880
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7705197922928124,
+                "positives": 283,
+                "negatives": 3774
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.8126130907252969,
+                "positives": 100,
+                "negatives": 3957
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7487487398446302,
+                "positives": 42,
+                "negatives": 4015
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8515164604093004,
+                "positives": 153,
+                "negatives": 3904
+              }
+            ]
+          },
+          "60-79": {
+            "images": 1949,
+            "patients": 601,
+            "mean_auroc": 0.8594811355581807,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7865170648384086,
+                "positives": 251,
+                "negatives": 1698
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.9180252892117298,
+                "positives": 59,
+                "negatives": 1890
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8157025586207842,
+                "positives": 78,
+                "negatives": 1871
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.880064935064935,
+                "positives": 24,
+                "negatives": 1925
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8594811355581807,
+                "positives": 256,
+                "negatives": 1693
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.83046723952739,
+                "positives": 49,
+                "negatives": 1900
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.780821232849314,
+                "positives": 26,
+                "negatives": 1923
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.7672839506172839,
+                "positives": 5,
+                "negatives": 1944
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.712434346351743,
+                "positives": 351,
+                "negatives": 1598
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8487493202827624,
+                "positives": 110,
+                "negatives": 1839
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7334915910982769,
+                "positives": 151,
+                "negatives": 1798
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7398192085692086,
+                "positives": 77,
+                "negatives": 1872
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7546487603305785,
+                "positives": 13,
+                "negatives": 1936
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8686270270270271,
+                "positives": 74,
+                "negatives": 1875
+              }
+            ]
+          },
+          "80-100": {
+            "images": 69,
+            "patients": 30,
+            "mean_auroc": 0.7827160493827161,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.47745901639344257,
+                "positives": 8,
+                "negatives": 61
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.26119402985074625,
+                "positives": 2,
+                "negatives": 67
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.8232323232323232,
+                "positives": 3,
+                "negatives": 66
+              },
+              {
+                "label": "Edema",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 69
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.7827160493827161,
+                "positives": 15,
+                "negatives": 54
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.5588235294117647,
+                "positives": 1,
+                "negatives": 68
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 69
+              },
+              {
+                "label": "Hernia",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 69
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.6680327868852459,
+                "positives": 8,
+                "negatives": 61
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8294930875576036,
+                "positives": 7,
+                "negatives": 62
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.9343434343434344,
+                "positives": 3,
+                "negatives": 66
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.398989898989899,
+                "positives": 3,
+                "negatives": 66
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.08208955223880599,
+                "positives": 2,
+                "negatives": 67
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.7121212121212122,
+                "positives": 3,
+                "negatives": 66
+              }
+            ]
+          },
+          "invalid (age > 100)": {
+            "images": 1,
+            "excluded": true
+          }
+        }
+      }
+    },
+    "test": {
+      "name": "test (official test_list.txt)",
+      "images": 25596,
+      "patients": 2797,
+      "mean_auroc": 0.8037408268273417,
+      "mean_auroc_ci": {
+        "low": 0.7971244973350943,
+        "high": 0.8099172846360564,
+        "valid_resamples": 1000
+      },
+      "labels": [
+        {
+          "label": "Atelectasis",
+          "auroc": 0.7718655323881705,
+          "positives": 3279,
+          "negatives": 22317,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 1797,
+              "fp": 4071,
+              "fn": 1482,
+              "tn": 18246,
+              "precision": 0.3062372188139059,
+              "sensitivity": 0.5480329368709973,
+              "specificity": 0.8175830084688802,
+              "f1": 0.39291571006887505
+            },
+            "sensitivity_80": {
+              "tp": 2781,
+              "fp": 10707,
+              "fn": 498,
+              "tn": 11610,
+              "precision": 0.2061832740213523,
+              "sensitivity": 0.848124428179323,
+              "specificity": 0.5202312138728323,
+              "f1": 0.33172302737520126
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7583277068055401,
+            "high": 0.7855851978973009,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Cardiomegaly",
+          "auroc": 0.884170832067888,
+          "positives": 1069,
+          "negatives": 24527,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 435,
+              "fp": 648,
+              "fn": 634,
+              "tn": 23879,
+              "precision": 0.40166204986149584,
+              "sensitivity": 0.4069223573433115,
+              "specificity": 0.9735801361764586,
+              "f1": 0.40427509293680297
+            },
+            "sensitivity_80": {
+              "tp": 801,
+              "fp": 3721,
+              "fn": 268,
+              "tn": 20806,
+              "precision": 0.17713401149933658,
+              "sensitivity": 0.7492984097287184,
+              "specificity": 0.848289639988584,
+              "f1": 0.2865319263101413
+            }
+          },
+          "auroc_ci": {
+            "low": 0.8666296569875845,
+            "high": 0.8978191763420947,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Consolidation",
+          "auroc": 0.7433041031089129,
+          "positives": 1815,
+          "negatives": 23781,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 1145,
+              "fp": 6734,
+              "fn": 670,
+              "tn": 17047,
+              "precision": 0.14532301053433178,
+              "sensitivity": 0.6308539944903582,
+              "specificity": 0.7168327656532526,
+              "f1": 0.23622859500722096
+            },
+            "sensitivity_80": {
+              "tp": 1596,
+              "fp": 12729,
+              "fn": 219,
+              "tn": 11052,
+              "precision": 0.11141361256544502,
+              "sensitivity": 0.8793388429752066,
+              "specificity": 0.4647407594297969,
+              "f1": 0.19776951672862453
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7284593532144447,
+            "high": 0.7578978566779092,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Edema",
+          "auroc": 0.846478796091702,
+          "positives": 925,
+          "negatives": 24671,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 409,
+              "fp": 2004,
+              "fn": 516,
+              "tn": 22667,
+              "precision": 0.16949854952341484,
+              "sensitivity": 0.44216216216216214,
+              "specificity": 0.9187710267115237,
+              "f1": 0.24505692031156381
+            },
+            "sensitivity_80": {
+              "tp": 793,
+              "fp": 8257,
+              "fn": 132,
+              "tn": 16414,
+              "precision": 0.08762430939226519,
+              "sensitivity": 0.8572972972972973,
+              "specificity": 0.665315552673179,
+              "f1": 0.15899749373433583
+            }
+          },
+          "auroc_ci": {
+            "low": 0.8304957996079364,
+            "high": 0.8614460090455952,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Effusion",
+          "auroc": 0.8231225131295032,
+          "positives": 4658,
+          "negatives": 20938,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 3056,
+              "fp": 3920,
+              "fn": 1602,
+              "tn": 17018,
+              "precision": 0.4380733944954128,
+              "sensitivity": 0.6560755689136969,
+              "specificity": 0.8127805903142612,
+              "f1": 0.5253567130823449
+            },
+            "sensitivity_80": {
+              "tp": 4026,
+              "fp": 8419,
+              "fn": 632,
+              "tn": 12519,
+              "precision": 0.3235034150261149,
+              "sensitivity": 0.8643194504079004,
+              "specificity": 0.5979081096570829,
+              "f1": 0.4707945974390458
+            }
+          },
+          "auroc_ci": {
+            "low": 0.8125274338592128,
+            "high": 0.8340515908474536,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Emphysema",
+          "auroc": 0.9031057645573133,
+          "positives": 1093,
+          "negatives": 24503,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 507,
+              "fp": 754,
+              "fn": 586,
+              "tn": 23749,
+              "precision": 0.4020618556701031,
+              "sensitivity": 0.4638609332113449,
+              "specificity": 0.9692282577643554,
+              "f1": 0.43075615972812237
+            },
+            "sensitivity_80": {
+              "tp": 1029,
+              "fp": 9628,
+              "fn": 64,
+              "tn": 14875,
+              "precision": 0.09655625410528292,
+              "sensitivity": 0.9414455626715462,
+              "specificity": 0.6070685222217688,
+              "f1": 0.17514893617021277
+            }
+          },
+          "auroc_ci": {
+            "low": 0.8896431702827299,
+            "high": 0.9145185765042008,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Fibrosis",
+          "auroc": 0.8224463421085451,
+          "positives": 435,
+          "negatives": 25161,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 74,
+              "fp": 451,
+              "fn": 361,
+              "tn": 24710,
+              "precision": 0.14095238095238094,
+              "sensitivity": 0.17011494252873563,
+              "specificity": 0.982075434203728,
+              "f1": 0.15416666666666667
+            },
+            "sensitivity_80": {
+              "tp": 361,
+              "fp": 8854,
+              "fn": 74,
+              "tn": 16307,
+              "precision": 0.03917525773195876,
+              "sensitivity": 0.8298850574712644,
+              "specificity": 0.6481061960971345,
+              "f1": 0.07481865284974093
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7971047108040842,
+            "high": 0.845644311149202,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Hernia",
+          "auroc": 0.865358090306583,
+          "positives": 86,
+          "negatives": 25510,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 4,
+              "fp": 5,
+              "fn": 82,
+              "tn": 25505,
+              "precision": 0.4444444444444444,
+              "sensitivity": 0.046511627906976744,
+              "specificity": 0.9998039984319874,
+              "f1": 0.08421052631578947
+            },
+            "sensitivity_80": null
+          },
+          "auroc_ci": {
+            "low": 0.80751970336642,
+            "high": 0.9218809709699223,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Infiltration",
+          "auroc": 0.6988174524794676,
+          "positives": 6112,
+          "negatives": 19484,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 4199,
+              "fp": 7168,
+              "fn": 1913,
+              "tn": 12316,
+              "precision": 0.3694026568135832,
+              "sensitivity": 0.6870091623036649,
+              "specificity": 0.6321083966331349,
+              "f1": 0.4804622690085245
+            },
+            "sensitivity_80": {
+              "tp": 5641,
+              "fp": 14934,
+              "fn": 471,
+              "tn": 4550,
+              "precision": 0.27416767922235724,
+              "sensitivity": 0.9229384816753927,
+              "specificity": 0.23352494354342024,
+              "f1": 0.42275265110353355
+            }
+          },
+          "auroc_ci": {
+            "low": 0.6886477167658254,
+            "high": 0.7090110468663727,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Mass",
+          "auroc": 0.8136600692639961,
+          "positives": 1748,
+          "negatives": 23848,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 684,
+              "fp": 1205,
+              "fn": 1064,
+              "tn": 22643,
+              "precision": 0.3620963472736898,
+              "sensitivity": 0.391304347826087,
+              "specificity": 0.9494716538074471,
+              "f1": 0.37613417651910913
+            },
+            "sensitivity_80": {
+              "tp": 1446,
+              "fp": 9160,
+              "fn": 302,
+              "tn": 14688,
+              "precision": 0.13633792193098246,
+              "sensitivity": 0.8272311212814645,
+              "specificity": 0.6159007044615901,
+              "f1": 0.2340942204953861
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7943177490155856,
+            "high": 0.8321414881489265,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Nodule",
+          "auroc": 0.7451182821997401,
+          "positives": 1623,
+          "negatives": 23973,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 591,
+              "fp": 2055,
+              "fn": 1032,
+              "tn": 21918,
+              "precision": 0.2233560090702948,
+              "sensitivity": 0.36414048059149723,
+              "specificity": 0.9142785633838068,
+              "f1": 0.2768798313422347
+            },
+            "sensitivity_80": {
+              "tp": 1426,
+              "fp": 15271,
+              "fn": 197,
+              "tn": 8702,
+              "precision": 0.08540456369407678,
+              "sensitivity": 0.8786198398028343,
+              "specificity": 0.36299169899470235,
+              "f1": 0.1556768558951965
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7225168296768485,
+            "high": 0.7644578546940405,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Pleural_Thickening",
+          "auroc": 0.7655142282162589,
+          "positives": 1143,
+          "negatives": 24453,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 359,
+              "fp": 2025,
+              "fn": 784,
+              "tn": 22428,
+              "precision": 0.15058724832214765,
+              "sensitivity": 0.31408573928258965,
+              "specificity": 0.917188075082812,
+              "f1": 0.20357244116813156
+            },
+            "sensitivity_80": {
+              "tp": 986,
+              "fp": 11998,
+              "fn": 157,
+              "tn": 12455,
+              "precision": 0.075939617991374,
+              "sensitivity": 0.8626421697287839,
+              "specificity": 0.5093444567128778,
+              "f1": 0.13959085439229843
+            }
+          },
+          "auroc_ci": {
+            "low": 0.7455328207701681,
+            "high": 0.7853349360977907,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Pneumonia",
+          "auroc": 0.7063323536787056,
+          "positives": 555,
+          "negatives": 25041,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 167,
+              "fp": 2718,
+              "fn": 388,
+              "tn": 22323,
+              "precision": 0.05788561525129983,
+              "sensitivity": 0.3009009009009009,
+              "specificity": 0.8914580088654607,
+              "f1": 0.09709302325581395
+            },
+            "sensitivity_80": {
+              "tp": 516,
+              "fp": 18256,
+              "fn": 39,
+              "tn": 6785,
+              "precision": 0.027487747709354356,
+              "sensitivity": 0.9297297297297298,
+              "specificity": 0.27095563276226986,
+              "f1": 0.05339680240078647
+            }
+          },
+          "auroc_ci": {
+            "low": 0.6810672353944667,
+            "high": 0.7295426086860036,
+            "valid_resamples": 1000
+          }
+        },
+        {
+          "label": "Pneumothorax",
+          "auroc": 0.8630772159859954,
+          "positives": 2665,
+          "negatives": 22931,
+          "at_thresholds": {
+            "best_f1": {
+              "tp": 1763,
+              "fp": 2729,
+              "fn": 902,
+              "tn": 20202,
+              "precision": 0.3924755120213713,
+              "sensitivity": 0.6615384615384615,
+              "specificity": 0.8809907984824037,
+              "f1": 0.49266452424200086
+            },
+            "sensitivity_80": {
+              "tp": 2417,
+              "fp": 8619,
+              "fn": 248,
+              "tn": 14312,
+              "precision": 0.21901051105472996,
+              "sensitivity": 0.9069418386491557,
+              "specificity": 0.6241332693733374,
+              "f1": 0.3528209619735786
+            }
+          },
+          "auroc_ci": {
+            "low": 0.8442072607902056,
+            "high": 0.8781869147589214,
+            "valid_resamples": 1000
+          }
+        }
+      ],
+      "by_sex": {
+        "labels_in_mean": [
+          "Atelectasis",
+          "Cardiomegaly",
+          "Consolidation",
+          "Edema",
+          "Effusion",
+          "Emphysema",
+          "Fibrosis",
+          "Hernia",
+          "Infiltration",
+          "Mass",
+          "Nodule",
+          "Pleural_Thickening",
+          "Pneumonia",
+          "Pneumothorax"
+        ],
+        "groups": {
+          "F": {
+            "images": 10714,
+            "patients": 1240,
+            "mean_auroc": 0.8018856092387102,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7596279539941153,
+                "positives": 1363,
+                "negatives": 9351
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8895928718264521,
+                "positives": 528,
+                "negatives": 10186
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7432537272325532,
+                "positives": 776,
+                "negatives": 9938
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8536988264781862,
+                "positives": 404,
+                "negatives": 10310
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8098101140861835,
+                "positives": 1921,
+                "negatives": 8793
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.9082642493166531,
+                "positives": 381,
+                "negatives": 10333
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.7818399293942773,
+                "positives": 184,
+                "negatives": 10530
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8882057050020308,
+                "positives": 45,
+                "negatives": 10669
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.70009665780269,
+                "positives": 2475,
+                "negatives": 8239
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8012953124780761,
+                "positives": 682,
+                "negatives": 10032
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7598637765701584,
+                "positives": 692,
+                "negatives": 10022
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7756769449664395,
+                "positives": 463,
+                "negatives": 10251
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.6875538227812293,
+                "positives": 221,
+                "negatives": 10493
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8676186374128984,
+                "positives": 1231,
+                "negatives": 9483
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.7914255519720642,
+              "high": 0.8108355634728667,
+              "valid_resamples": 1000
+            }
+          },
+          "M": {
+            "images": 14882,
+            "patients": 1557,
+            "mean_auroc": 0.8041577941340389,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7805282331467847,
+                "positives": 1916,
+                "negatives": 12966
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.878126465734723,
+                "positives": 541,
+                "negatives": 14341
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7434540043692233,
+                "positives": 1039,
+                "negatives": 13843
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.84075159036637,
+                "positives": 521,
+                "negatives": 14361
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8322057052366116,
+                "positives": 2737,
+                "negatives": 12145
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.9003861120582335,
+                "positives": 712,
+                "negatives": 14170
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8516161585630685,
+                "positives": 251,
+                "negatives": 14631
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8404814612124291,
+                "positives": 41,
+                "negatives": 14841
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.698013524600736,
+                "positives": 3637,
+                "negatives": 11245
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.821297784280346,
+                "positives": 1066,
+                "negatives": 13816
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7347738721246321,
+                "positives": 931,
+                "negatives": 13951
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7580093317428365,
+                "positives": 680,
+                "negatives": 14202
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7190797467479119,
+                "positives": 334,
+                "negatives": 14548
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8594851276926383,
+                "positives": 1434,
+                "negatives": 13448
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.7960629391738946,
+              "high": 0.8123691129806213,
+              "valid_resamples": 1000
+            }
+          }
+        }
+      },
+      "by_age_band": {
+        "labels_in_mean": [
+          "Atelectasis",
+          "Cardiomegaly",
+          "Consolidation",
+          "Effusion",
+          "Infiltration",
+          "Mass",
+          "Nodule",
+          "Pneumothorax"
+        ],
+        "groups": {
+          "0-17": {
+            "images": 1051,
+            "patients": 128,
+            "mean_auroc": 0.7852166645711096,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7746507127348248,
+                "positives": 88,
+                "negatives": 963
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8632253711201079,
+                "positives": 76,
+                "negatives": 975
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.6966871029694195,
+                "positives": 84,
+                "negatives": 967
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.7620857403466099,
+                "positives": 39,
+                "negatives": 1012
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.7584095613273686,
+                "positives": 170,
+                "negatives": 881
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.865937190900099,
+                "positives": 40,
+                "negatives": 1011
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8443594646271511,
+                "positives": 5,
+                "negatives": 1046
+              },
+              {
+                "label": "Hernia",
+                "auroc": null,
+                "positives": 0,
+                "negatives": 1051
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.6853191508363922,
+                "positives": 297,
+                "negatives": 754
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8559200353434946,
+                "positives": 45,
+                "negatives": 1006
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.739995631280035,
+                "positives": 70,
+                "negatives": 981
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7307825577056347,
+                "positives": 37,
+                "negatives": 1014
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.6734263465282284,
+                "positives": 46,
+                "negatives": 1005
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.9075257509572345,
+                "positives": 168,
+                "negatives": 883
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.7524262757914536,
+              "high": 0.8083645128213783,
+              "valid_resamples": 1000
+            }
+          },
+          "18-39": {
+            "images": 7239,
+            "patients": 934,
+            "mean_auroc": 0.7946496090653916,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.797504766683612,
+                "positives": 697,
+                "negatives": 6542
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8881718098921636,
+                "positives": 334,
+                "negatives": 6905
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7499751284607084,
+                "positives": 466,
+                "negatives": 6773
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8673360901825322,
+                "positives": 297,
+                "negatives": 6942
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8247068185092585,
+                "positives": 1132,
+                "negatives": 6107
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.9276670101746597,
+                "positives": 328,
+                "negatives": 6911
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8208350149534838,
+                "positives": 81,
+                "negatives": 7158
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.13843603205305333,
+                "positives": 1,
+                "negatives": 7238
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.696834208503024,
+                "positives": 1796,
+                "negatives": 5443
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8103673638337634,
+                "positives": 427,
+                "negatives": 6812
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7369146956747413,
+                "positives": 329,
+                "negatives": 6910
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7924163361114248,
+                "positives": 296,
+                "negatives": 6943
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7077428381452754,
+                "positives": 182,
+                "negatives": 7057
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.852722080965862,
+                "positives": 743,
+                "negatives": 6496
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.781014707046722,
+              "high": 0.8065820864142706,
+              "valid_resamples": 1000
+            }
+          },
+          "40-59": {
+            "images": 11224,
+            "patients": 1169,
+            "mean_auroc": 0.7928328589963012,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7596350490019952,
+                "positives": 1568,
+                "negatives": 9656
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8973261294689867,
+                "positives": 444,
+                "negatives": 10780
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7343384212658312,
+                "positives": 827,
+                "negatives": 10397
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8364658808845933,
+                "positives": 429,
+                "negatives": 10795
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8218704176515681,
+                "positives": 2111,
+                "negatives": 9113
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.9079666589667102,
+                "positives": 417,
+                "negatives": 10807
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8248937206374911,
+                "positives": 201,
+                "negatives": 11023
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8382606151145062,
+                "positives": 29,
+                "negatives": 11195
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.6977805017753864,
+                "positives": 2634,
+                "negatives": 8590
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8151078377112692,
+                "positives": 849,
+                "negatives": 10375
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7509496472554154,
+                "positives": 818,
+                "negatives": 10406
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7649751051305159,
+                "positives": 509,
+                "negatives": 10715
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7027074666401661,
+                "positives": 212,
+                "negatives": 11012
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8656548678399578,
+                "positives": 1110,
+                "negatives": 10114
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.7818853925176276,
+              "high": 0.8018723142433198,
+              "valid_resamples": 1000
+            }
+          },
+          "60-79": {
+            "images": 5826,
+            "patients": 662,
+            "mean_auroc": 0.7878267611007783,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.7581197486448539,
+                "positives": 887,
+                "negatives": 4939
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8471800763450333,
+                "positives": 197,
+                "negatives": 5629
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7582523717200281,
+                "positives": 414,
+                "negatives": 5412
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.8413282876106591,
+                "positives": 158,
+                "negatives": 5668
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8303124057241045,
+                "positives": 1182,
+                "negatives": 4644
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.870041340328618,
+                "positives": 301,
+                "negatives": 5525
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.8135258629741188,
+                "positives": 139,
+                "negatives": 5687
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8427017292843575,
+                "positives": 35,
+                "negatives": 5791
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.7031282776003724,
+                "positives": 1331,
+                "negatives": 4495
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8051417845140789,
+                "positives": 412,
+                "negatives": 5414
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7305293410630804,
+                "positives": 388,
+                "negatives": 5438
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7401183716106162,
+                "positives": 292,
+                "negatives": 5534
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7081644824734398,
+                "positives": 110,
+                "negatives": 5716
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8699500831946756,
+                "positives": 601,
+                "negatives": 5225
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.7754482320819505,
+              "high": 0.7989610062431545,
+              "valid_resamples": 1000
+            }
+          },
+          "80-100": {
+            "images": 252,
+            "patients": 31,
+            "mean_auroc": 0.7854694538110001,
+            "labels": [
+              {
+                "label": "Atelectasis",
+                "auroc": 0.625496569158541,
+                "positives": 39,
+                "negatives": 213
+              },
+              {
+                "label": "Cardiomegaly",
+                "auroc": 0.8989791073124406,
+                "positives": 18,
+                "negatives": 234
+              },
+              {
+                "label": "Consolidation",
+                "auroc": 0.7849963450292398,
+                "positives": 24,
+                "negatives": 228
+              },
+              {
+                "label": "Edema",
+                "auroc": 0.6613545816733067,
+                "positives": 1,
+                "negatives": 251
+              },
+              {
+                "label": "Effusion",
+                "auroc": 0.8077249575551784,
+                "positives": 62,
+                "negatives": 190
+              },
+              {
+                "label": "Emphysema",
+                "auroc": 0.8291545189504373,
+                "positives": 7,
+                "negatives": 245
+              },
+              {
+                "label": "Fibrosis",
+                "auroc": 0.5372656607224509,
+                "positives": 9,
+                "negatives": 243
+              },
+              {
+                "label": "Hernia",
+                "auroc": 0.8033395176252319,
+                "positives": 21,
+                "negatives": 231
+              },
+              {
+                "label": "Infiltration",
+                "auroc": 0.7326038159371492,
+                "positives": 54,
+                "negatives": 198
+              },
+              {
+                "label": "Mass",
+                "auroc": 0.8164765906362546,
+                "positives": 14,
+                "negatives": 238
+              },
+              {
+                "label": "Nodule",
+                "auroc": 0.7933285849952516,
+                "positives": 18,
+                "negatives": 234
+              },
+              {
+                "label": "Pleural_Thickening",
+                "auroc": 0.7161885245901639,
+                "positives": 8,
+                "negatives": 244
+              },
+              {
+                "label": "Pneumonia",
+                "auroc": 0.7752016129032258,
+                "positives": 4,
+                "negatives": 248
+              },
+              {
+                "label": "Pneumothorax",
+                "auroc": 0.8241496598639455,
+                "positives": 42,
+                "negatives": 210
+              }
+            ],
+            "mean_auroc_ci": {
+              "low": 0.6964706686664586,
+              "high": 0.8162598999654609,
+              "valid_resamples": 992
+            }
+          },
+          "invalid (age > 100)": {
+            "images": 4,
+            "excluded": true
+          }
+        }
+      }
+    }
+  }
+}
