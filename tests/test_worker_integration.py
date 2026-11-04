@@ -61,11 +61,15 @@ def test_worker_processes_new_studies_once(tmp_path: Path) -> None:
 
     worker = Worker(orthanc, store, [classifier(), segmenter()], tmp_path / "results")
     deadline = time.monotonic() + 90  # StableStudy comes 5 s after the last instance
-    while time.monotonic() < deadline and len(store.rows()) < 2:
+    ours = {study_dx, study_ct}
+    while time.monotonic() < deadline and len(ours & {r["study_uid"] for r in store.rows()}) < 2:
         worker.poll_once()
         time.sleep(1)
-    rows = store.rows()
-    print(f"rows {len(rows)}, seq {start} -> {store.last_seq()}")
+    # Other studies that became stable meanwhile (other tests' uploads) are processed too.
+    rows = [row for row in store.rows() if row["study_uid"] in ours]
+    print(
+        f"rows {len(rows)} of ours ({len(store.rows())} in all), seq {start} -> {store.last_seq()}"
+    )
     assert sorted((row["study_uid"], row["modality"], row["status"]) for row in rows) == sorted(
         [(study_dx, "DX", "ok"), (study_ct, "CT", "ok")]
     )
@@ -79,7 +83,7 @@ def test_worker_processes_new_studies_once(tmp_path: Path) -> None:
         first["study_uid"], "x", "DX", "m", "c", first["checkpoint_sha256"], "ok", {}, 0.0
     )
     assert store.insert(duplicate) is False
-    after = store.rows()
+    after = [row for row in store.rows() if row["study_uid"] in ours]
     print(f"rows before rerun {len(rows)}, after {len(after)}")
     assert rows and after and len(after) == len(rows)
     store.close()
