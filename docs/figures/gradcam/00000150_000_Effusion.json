@@ -1,0 +1,15 @@
+{
+  "notice": "For education only, not for clinical use.",
+  "image": "00000150_000.png",
+  "label": "Effusion",
+  "checkpoint": "epoch_003.pt",
+  "checkpoint_epoch": 3,
+  "score": 0.018951961770653725,
+  "score_note": "sigmoid of the model output; not a calibrated probability",
+  "threshold": 0.08050192147493362,
+  "threshold_set": "sensitivity_80",
+  "low_reliability": false,
+  "above_threshold": false,
+  "target_layer": "features.denseblock4",
+  "overlay": "00000150_000_Effusion.png"
+}

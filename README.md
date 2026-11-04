@@ -262,9 +262,22 @@ It runs on CPU and never overwrites a file. Tests check four things:
 - determinism
 - the sanity check: the map changes when the top layers are randomized
 
-Six demo overlays from test-split images, with how they were chosen, are in
-[docs/figures/gradcam](docs/figures/gradcam/README.md). A map shows what raised the score, not
-where a finding is.
+The sanity check was also run on the trained checkpoint (`epoch_003.pt`). The classifier and
+the last dense block were randomized, and the trained and randomized maps compared:
+
+- correlation -0.19 for 00000013_045 (Cardiomegaly)
+- correlation 0.23 for 00000013_021 (Effusion)
+- correlation -0.18 for 00000013_020 (Pneumothorax)
+
+So the maps depend on the trained weights. That does not show they mark the finding.
+
+Twelve demo overlays from test-split images are in
+[docs/figures/gradcam](docs/figures/gradcam/README.md): two sets chosen by fixed rules, with
+scores and where each map sits. A map shows what raised the score, not where a finding is.
+Caveats from the demo:
+
+- Devices: 4 of the 6 first-set images show a pacemaker, including both Cardiomegaly images.
+- Label specificity: maps for different labels can cover nearly the same region.
 
 ## Segmentation model (3D U-Net)
 
