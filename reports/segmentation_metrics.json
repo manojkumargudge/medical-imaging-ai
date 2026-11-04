@@ -1,0 +1,67 @@
+{
+  "notice": "For education only, not for clinical use.",
+  "dataset": "Medical Segmentation Decathlon Task09_Spleen (labelled cases)",
+  "checkpoint_epoch": 180,
+  "metric": "Dice of the spleen label, sliding-window inference at (1.5, 1.5, 1.5) mm",
+  "splits": {
+    "val": {
+      "cases": [
+        {
+          "case": "spleen_16",
+          "dice": 0.9090973734855652
+        },
+        {
+          "case": "spleen_22",
+          "dice": 0.9637850522994995
+        },
+        {
+          "case": "spleen_33",
+          "dice": 0.9208095669746399
+        },
+        {
+          "case": "spleen_47",
+          "dice": 0.9106923341751099
+        },
+        {
+          "case": "spleen_52",
+          "dice": 0.9544985890388489
+        },
+        {
+          "case": "spleen_56",
+          "dice": 0.8580249547958374
+        }
+      ],
+      "mean_dice": 0.9194846451282501
+    },
+    "test": {
+      "cases": [
+        {
+          "case": "spleen_14",
+          "dice": 0.9579163193702698
+        },
+        {
+          "case": "spleen_20",
+          "dice": 0.949525773525238
+        },
+        {
+          "case": "spleen_21",
+          "dice": 0.9075701832771301
+        },
+        {
+          "case": "spleen_41",
+          "dice": 0.9246875047683716
+        },
+        {
+          "case": "spleen_44",
+          "dice": 0.8262655138969421
+        },
+        {
+          "case": "spleen_61",
+          "dice": 0.9395660161972046
+        }
+      ],
+      "mean_dice": 0.9175885518391927
+    }
+  },
+  "repo_commit": "30c5b9873717a0658ee9238bad18001736cf9fee"
+}
