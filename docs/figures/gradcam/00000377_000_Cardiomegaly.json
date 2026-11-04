@@ -1,0 +1,15 @@
+{
+  "notice": "For education only, not for clinical use.",
+  "image": "00000377_000.png",
+  "label": "Cardiomegaly",
+  "checkpoint": "epoch_003.pt",
+  "checkpoint_epoch": 3,
+  "score": 0.8235241174697876,
+  "score_note": "sigmoid of the model output; not a calibrated probability",
+  "threshold": 0.024798160418868065,
+  "threshold_set": "sensitivity_80",
+  "low_reliability": false,
+  "above_threshold": true,
+  "target_layer": "features.denseblock4",
+  "overlay": "00000377_000_Cardiomegaly.png"
+}

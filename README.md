@@ -20,6 +20,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `src/models/`: DenseNet121 classifier (config, data and augmentation, training, metrics,
   evaluation), 3D U-Net segmentation (`segmentation.py`), shared checkpoint helpers
 - `configs/classifier.yaml`, `configs/segmentation.yaml`: the fixed training configs
+- `src/explain/gradcam.py`: Grad-CAM overlays for the classifier
 - `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
   run yet)
 - `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
@@ -235,6 +236,48 @@ the same Drive folder):
 Run `notebooks/colab_train.ipynb` on a GPU runtime. On Colab, the notebooks use Colab's own torch
 build. The versions it uses are recorded in each checkpoint and in the report, and may differ from
 the local pins.
+
+## Grad-CAM
+
+`src/explain/gradcam.py` shows which regions of a chest X-ray raised one label's score.
+
+- **Target layer:** the classifier's last dense block (`features.denseblock4`).
+- **Preprocessing:** the image goes through the evaluation path: `resize_png` from the
+  preprocess stage, then the test-split transform from `src/models/data.py`.
+- **Output:** a map the size of the model input with values in [0, 1].
+
+```
+python -m src.explain.gradcam --checkpoint epoch_003.pt --image 00000013_045.png     --label Cardiomegaly --out-dir reports/gradcam
+```
+
+This writes:
+
+- an overlay PNG
+- a JSON with the score, plus the threshold and reliability from `configs/viewer_thresholds.yaml`
+
+It runs on CPU and never overwrites a file. Tests check four things:
+
+- the map size
+- the value range
+- determinism
+- the sanity check: the map changes when the top layers are randomized
+
+The sanity check was also run on the trained checkpoint (`epoch_003.pt`). The classifier and
+the last dense block were randomized, and the trained and randomized maps compared:
+
+- correlation -0.19 for 00000013_045 (Cardiomegaly)
+- correlation 0.23 for 00000013_021 (Effusion)
+- correlation -0.18 for 00000013_020 (Pneumothorax)
+
+So the maps depend on the trained weights. That does not show they mark the finding.
+
+Twelve demo overlays from test-split images are in
+[docs/figures/gradcam](docs/figures/gradcam/README.md): two sets chosen by fixed rules, with
+scores and where each map sits. A map shows what raised the score, not where a finding is.
+Caveats from the demo:
+
+- Devices: 4 of the 6 first-set images show a pacemaker, including both Cardiomegaly images.
+- Label specificity: maps for different labels can cover nearly the same region.
 
 ## Segmentation model (3D U-Net)
 
