@@ -10,7 +10,12 @@ export function Layout({ children }: { children: ReactNode }) {
         {NOTICE}
       </div>
       <header className="header">
-        <a href="#/">AIML-02 viewer</a>
+        <a href="#/" className="brand">
+          AIML-02 viewer
+        </a>
+        <nav>
+          <a href="#/">Worklist</a> <a href="#/audit">Audit log</a>
+        </nav>
       </header>
       <main className="main">{children}</main>
     </>

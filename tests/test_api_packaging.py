@@ -73,6 +73,12 @@ def test_the_frontend_image_pins_its_base_images() -> None:
     assert images and all(re.search(r":\d+\.\d+\.\d+-", image) for image in images)
     package = (REPO_ROOT / "frontend" / "package.json").read_text(encoding="utf-8")
     assert not re.search(r'"[\^~]', package)  # exact versions only
+    # One Node version: .nvmrc (CI reads it), the build image, and package.json engines.
+    node = (REPO_ROOT / "frontend" / ".nvmrc").read_text(encoding="utf-8").strip()
+    assert re.fullmatch(r"\d+\.\d+\.\d+", node)
+    assert images[0].startswith(f"node:{node}-")
+    major = int(node.split(".")[0])
+    assert f'"node": ">={node} <{major + 1}"' in package
 
 
 def test_the_test_stack_api_has_its_own_port_and_results_folder() -> None:

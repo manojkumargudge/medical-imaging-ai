@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, getHealth, getJson, healthProblems, type StudySummary } from "../api";
 import { POLL_MS, reviewBadge, shouldPoll, statusBadge } from "../status";
+import { formatLocal } from "../time";
 import { BadgeView, ErrorBox } from "./Layout";
+
+/** The whole row opens the study; the Open link stays for keyboard users. */
+export function openStudy(id: string): void {
+  window.location.hash = `#/studies/${id}`;
+}
 
 interface Problem {
   title: string;
@@ -69,27 +75,31 @@ export function Worklist() {
             <thead>
               <tr>
                 <th>Patient ID</th>
+                <th>Study</th>
                 <th>Modality</th>
                 <th>Status</th>
+                <th>Summary</th>
                 <th>Review</th>
                 <th>Source</th>
-                <th>Updated (UTC)</th>
-                <th>Study</th>
+                <th>Updated</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {studies.map((s) => (
-                <tr key={s.id}>
+                <tr key={s.id} className="clickable" onClick={() => openStudy(s.id)}>
                   <td>{s.patient_id}</td>
+                  <td>{s.description || "—"}</td>
                   <td>{s.modality || "—"}</td>
                   <td>
                     <BadgeView badge={statusBadge(s.status)} />
                   </td>
+                  <td>{s.summary ?? "—"}</td>
                   <td>
                     <BadgeView badge={reviewBadge(s.review_status)} />
                   </td>
                   <td>{s.source}</td>
-                  <td>{s.updated_at ? s.updated_at.slice(0, 19).replace("T", " ") : "—"}</td>
+                  <td>{formatLocal(s.updated_at)}</td>
                   <td>
                     <a href={`#/studies/${s.id}`}>Open</a>
                   </td>

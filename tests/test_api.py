@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import numpy as np
 import pytest
@@ -17,7 +18,14 @@ from test_worker import dx
 
 from src.api import studies
 from src.api.app import Services, create_app, load_thresholds
-from src.api.db import DatabaseUnavailableError
+from src.api.db import (
+    ALREADY_SAVED,
+    NEWER_RESULT,
+    DatabaseUnavailableError,
+    NewReview,
+    ReviewConflictError,
+    ReviewInvalidError,
+)
 from src.dicom.render import to_png
 from src.service.orthanc import Orthanc, OrthancError
 
@@ -103,9 +111,14 @@ class FakeOrthanc(Orthanc):
 
 @dataclass
 class FakeDb:
+    """The results database's rules as the real one applies them (tested on Postgres in
+    test_api_integration.py): newest result only, one row per submit token, audit per review."""
+
     results: list[dict[str, Any]] = field(default_factory=list)
-    reviews: list[dict[str, Any]] = field(default_factory=list)
-    uploads: set[str] = field(default_factory=set)
+    review_rows: list[dict[str, Any]] = field(default_factory=list)
+    audit_rows: list[dict[str, Any]] = field(default_factory=list)
+    uploads: dict[str, str] = field(default_factory=dict)
+    tokens: set[UUID] = field(default_factory=set)
     down: bool = False
 
     def _check(self) -> None:
@@ -121,17 +134,66 @@ class FakeDb:
         newest: dict[tuple[str, str], dict[str, Any]] = {}
         for row in sorted(self.results, key=lambda r: r["id"]):
             newest[(row["study_uid"], row["model"])] = row
-        rows = [r for r in newest.values() if study_uid in (None, r["study_uid"])]
-        return rows if study_uid else [{k: v for k, v in r.items() if k != "results"} for r in rows]
+        return [r for r in newest.values() if study_uid in (None, r["study_uid"])]
 
     def newest_reviews(self, study_uid: str | None = None) -> dict[str, dict[str, Any]]:
         self._check()
-        newest = {r["study_uid"]: r for r in sorted(self.reviews, key=lambda r: r["id"])}
+        newest = {r["study_uid"]: r for r in sorted(self.review_rows, key=lambda r: r["id"])}
         return {k: v for k, v in newest.items() if study_uid in (None, k)}
 
-    def uploaded(self) -> set[str]:
+    def uploaded(self) -> dict[str, str]:
         self._check()
-        return set(self.uploads)
+        return dict(self.uploads)
+
+    def reviews(self, study_uid: str) -> list[dict[str, Any]]:
+        self._check()
+        return [r for r in reversed(self.review_rows) if r["study_uid"] == study_uid]
+
+    def add_review(self, review: NewReview) -> dict[str, Any]:
+        self._check()
+        seen = [
+            r
+            for r in self.results
+            if r["id"] == review.inference_result_id and r["study_uid"] == review.study_uid
+        ]
+        if not seen:
+            raise ReviewInvalidError("inference_result_id is not a result of this study")
+        newest = max(
+            r["id"]
+            for r in self.results
+            if r["study_uid"] == review.study_uid and r["model"] == seen[0]["model"]
+        )
+        if newest != review.inference_result_id:
+            raise ReviewConflictError(NEWER_RESULT)
+        if review.submit_token in self.tokens:
+            raise ReviewConflictError(ALREADY_SAVED)
+        self.tokens.add(review.submit_token)
+        row = {
+            "id": len(self.review_rows) + 1,
+            "study_uid": review.study_uid,
+            "inference_result_id": review.inference_result_id,
+            "decision": review.decision,
+            "reviewer": review.reviewer,
+            "comment": review.comment,
+            "created_at": T0,
+        }
+        self.review_rows.append(row)
+        self.audit_rows.append(
+            {
+                "id": len(self.audit_rows) + 1,
+                "created_at": T0,
+                "actor": review.reviewer,
+                "event": "review",
+                "study_uid": review.study_uid,
+                "details": {"review_id": row["id"], "decision": review.decision},
+            }
+        )
+        return row
+
+    def audit(self, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
+        self._check()
+        newest_first = list(reversed(self.audit_rows))
+        return newest_first[offset : offset + limit], len(newest_first)
 
     def add_result(self, uid: str, model: str, status: str = "ok", **results: Any) -> None:
         self.results.append(
@@ -183,12 +245,12 @@ def test_worklist_status_review_and_source(
     db.add_result("1.3", studies.CLASSIFIER)
     db.add_result("1.4", studies.CLASSIFIER, "error")
     db.add_result("1.6", studies.CLASSIFIER)  # the CT model has not finished
-    db.reviews += [
+    db.review_rows += [
         {"id": 1, "study_uid": "1.3", "decision": "approve", "created_at": T0},
         {"id": 2, "study_uid": "1.3", "decision": "reject", "created_at": T0},
         {"id": 3, "study_uid": "1.4", "decision": "approve", "created_at": T0},
     ]
-    db.uploads = {"failed"}
+    db.uploads = {"failed": "upload.dcm"}
     found = statuses(client)
     print(found)
     assert found == {
@@ -217,7 +279,7 @@ def test_study_detail(setup: tuple[FakeOrthanc, FakeDb, TestClient, Path]) -> No
     orthanc, db, client, _ = setup
     orthanc.add("s", "1.1", {"DX": [dx(1)]})
     db.add_result("1.1", studies.CLASSIFIER, spleen="x")
-    db.reviews.append({"id": 1, "study_uid": "1.1", "decision": "approve", "created_at": T0})
+    db.review_rows.append({"id": 1, "study_uid": "1.1", "decision": "approve", "created_at": T0})
     body = client.get("/api/studies/s").json()
     assert body["study"]["status"] == "done" and body["review"]["decision"] == "approve"
     assert body["results"][0]["results"] == {"spleen": "x"}

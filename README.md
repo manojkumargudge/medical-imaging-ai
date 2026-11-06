@@ -38,6 +38,9 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 
 ## Setup
 
+Prerequisites: Python 3.11, Docker with Compose, and for the viewer's frontend Node.js 22.22.2
+or a later 22.x (`frontend/.nvmrc`; `package.json` `engines` is `>=22.22.2 <23`).
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev,api]"
@@ -474,18 +477,33 @@ review rules, the audit trigger, and the append-only triggers.
 
 ## Viewer API
 
-`src/api/` is the viewer's own API (FastAPI), read-only so far. For education only, not for
-clinical use. The browser talks only to this API: the Orthanc credentials are in the API
+`src/api/` is the viewer's own API (FastAPI). Its only write is a review, saved with its audit
+row in one transaction. For education only, not for clinical use. The browser talks only to this API: the Orthanc credentials are in the API
 container's environment and nowhere else. The port is bound to 127.0.0.1.
 
 | endpoint | returns |
 |---|---|
 | `GET /api/health` | database and Orthanc reachable, Orthanc name and stack (`demo` or `test`); 503 if either is down |
-| `GET /api/studies` | worklist: study, patient ID, modality, processing status, review status, source, updated time |
+| `GET /api/studies` | worklist: study, patient ID, study name, modality, processing status, summary of the newest result, review status, source, updated time |
 | `GET /api/studies/{id}` | the study, its series, the newest result per model, the latest review |
 | `GET /api/studies/{id}/image` | the DX/CR image as an 8-bit PNG, from the DICOM file in Orthanc |
 | `GET /api/studies/{id}/cam/{label}` | the raw Grad-CAM map (8-bit grey 224px PNG) of the newest classifier result |
 | `GET /api/config/thresholds` | `configs/viewer_thresholds.yaml` and the note that scores are not calibrated probabilities |
+| `GET /api/studies/{id}/reviews` | the study's reviews, newest first |
+| `POST /api/studies/{id}/reviews` | save a review: `decision` (`approve` or `reject`), `reviewer`, `comment` (required to reject), `submit_token` (a UUID), `inference_result_id` (the result the reviewer saw) |
+| `GET /api/audit?page=&page_size=` | the audit log, newest first, paged (at most 200 per page) |
+
+A review answers 409 if its submit token was saved before ("already saved"), or if
+`inference_result_id` is not the study's newest result of that model ("a newer result exists,
+reload"); 422 for a missing or invalid field, including a reject without a comment (the
+database checks that too). The review and an audit row (`event = review`) are written in one
+transaction. Reviewer names are typed in and not verified: there is no login.
+
+Study name: the DICOM StudyDescription, else the first SeriesDescription, else the uploaded file
+name. The converter sets StudyDescription (the NIH image name, or the MSD case) from this
+change on; studies uploaded before it show the series description or nothing. Summary: for DX,
+how many of the 13 labels with a threshold are at or above it (Hernia is score only); for CT,
+the spleen volume from the mask.
 
 Processing status: `receiving` (Orthanc has not marked the study stable), `processing` (stable,
 no result row yet for a model that should run), `done`, `failed` (the newest row is an error),
@@ -524,10 +542,11 @@ never calls Orthanc and the frontend holds no credentials.
 
 Built so far:
 
-- **Worklist:** patient ID, modality, processing status and review status as text badges (the
-  colour only repeats the text), source, updated time. It refreshes every 3 s only while a study
-  is being received or processed. If the API reports a service down (`/api/health` 503), it says
-  which one and why.
+- **Worklist:** patient ID, study name, modality, processing status and review status as text
+  badges (the colour only repeats the text), a summary of the newest result, source, and the
+  updated time in the browser's time zone (for example "06 Nov 2026, 10:40 IST"). A click
+  anywhere on a row opens the study. It refreshes every 3 s only while a study is being received
+  or processed. If the API reports a service down (`/api/health` 503), it says which one and why.
 - **DX view:** the image with the raw Grad-CAM map coloured in the browser (jet, as the worker)
   and stretched over the whole image, as the model saw it (resized, not cropped). Overlay on/off,
   opacity (default 0.45) and a label picker. The scores table lists the 14 labels with score,
@@ -535,9 +554,15 @@ Built so far:
   the note that scores are not calibrated probabilities. Panels: known limits (from the Grad-CAM
   demo and the test-split metrics) and model scope (NIH ChestX-ray14 frontal X-rays only).
 - **CT view:** the spleen volume from the U-Net mask. The slice view comes later.
+- **Review panel** (DX and CT): Approve or Reject, with neither selected at first; the
+  reviewer's name; a comment, required to reject. Save is enabled only when that is complete,
+  and only a click saves: there is no form, so Enter never submits. The button is disabled while
+  saving, and each opened panel sends a new submit token, so a double click saves once. 409 and
+  422 messages from the API are shown. The history is below, newest first, and the panel says
+  "Names are not verified (education demo)."
+- **Audit log:** a paged table, newest first (link in the header).
 
-Planned: upload, review (Approve or Reject; there is no login, so the reviewer's name is typed in
-and not verified, and the viewer will say so), the audit log page, and the CT slice view.
+Planned: upload and the CT slice view.
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \

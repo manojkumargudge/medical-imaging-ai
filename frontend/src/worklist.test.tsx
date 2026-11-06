@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ProcessingStatus } from "./api";
 import { App } from "./App";
 import { Worklist } from "./components/Worklist";
@@ -112,4 +112,23 @@ test("the banner is on every page", async () => {
     expect(screen.getByRole("note").textContent).toBe("For education only. Not for clinical use.");
     cleanup();
   }
+});
+
+test("the whole row opens the study, and the summary and study name are shown", async () => {
+  const body = studies("done");
+  Object.assign(body.studies[0]!, {
+    description: "NIH ChestX-ray14 00000116_000.png",
+    summary: "3 of 13 above threshold",
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => reply(body)),
+  );
+  window.location.hash = "#/";
+  render(<Worklist />);
+  await flush();
+  expect(screen.getByText("3 of 13 above threshold")).toBeTruthy();
+  fireEvent.click(screen.getByText("NIH ChestX-ray14 00000116_000.png"));
+  expect(window.location.hash).toBe("#/studies/s0");
+  expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("#/studies/s0");
 });

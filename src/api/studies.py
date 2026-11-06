@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
+from typing import Any
 
 # The worker's model names (src/service/analyzers.py; tests/test_api.py checks they match).
 CLASSIFIER = "densenet121-chestxray14"
@@ -51,3 +52,39 @@ def review_status(decision: str | None) -> str:
 def orthanc_time(value: str) -> datetime:
     """Orthanc's LastUpdate ("20261106T050824"), in the container's time zone, which is UTC."""
     return datetime.strptime(value, "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+
+
+def result_summary(rows: Iterable[Mapping[str, Any]], thresholds: Mapping[str, Any]) -> str | None:
+    """One line from the newest result of each model.
+
+    DX: how many labels with a threshold (13; Hernia is score only) score at or above it, with
+    the thresholds in configs/viewer_thresholds.yaml. CT: the spleen volume from the mask.
+    """
+    parts = []
+    for row in sorted(rows, key=lambda r: str(r["model"])):
+        try:
+            if row["status"] != "ok":
+                parts.append("Failed")
+            elif row["model"] == CLASSIFIER:
+                scores = row["results"]["instances"][0]["labels"]
+                cut = {
+                    k: v["threshold"] for k, v in thresholds.items() if v["threshold"] is not None
+                }
+                above = sum(1 for label, t in cut.items() if scores[label]["score"] >= t)
+                parts.append(f"{above} of {len(cut)} above threshold")
+            elif row["model"] == SEGMENTATION:
+                volume = sum(series["spleen_ml"] for series in row["results"]["series"])
+                parts.append(f"Spleen {volume:.1f} mL")
+        except (KeyError, IndexError, TypeError):  # a malformed row must not break the worklist
+            parts.append("Result not readable")
+    return "; ".join(parts) or None
+
+
+def description(
+    study: Mapping[str, Any], series: Iterable[Mapping[str, Any]], filename: str | None
+) -> str:
+    """StudyDescription, else the first SeriesDescription, else the uploaded file's name."""
+    found = str(study.get("MainDicomTags", {}).get("StudyDescription") or "")
+    for one in series:
+        found = found or str(one.get("MainDicomTags", {}).get("SeriesDescription") or "")
+    return found or filename or ""

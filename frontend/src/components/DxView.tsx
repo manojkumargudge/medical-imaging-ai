@@ -10,6 +10,7 @@ import { defaultLabel, formatScore, scoreRows, VERDICT_TEXT } from "../scores";
 import { statusBadge } from "../status";
 import { CamOverlay } from "./CamOverlay";
 import { BadgeView } from "./Layout";
+import { ReviewPanel } from "./ReviewPanel";
 import { ScoresTable } from "./ScoresTable";
 
 export function KnownLimits() {
@@ -149,6 +150,10 @@ export function DxView({
         </div>
         <div className="dx-side">
           {result && <ScoresTable rows={rows} selected={label} note={thresholds.note} />}
+          <ReviewPanel
+            studyId={id}
+            resultId={detail.results.find((r) => r.model === CLASSIFIER)?.id ?? null}
+          />
           <ModelScope />
           <KnownLimits />
         </div>
