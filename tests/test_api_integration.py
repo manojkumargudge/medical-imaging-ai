@@ -178,3 +178,20 @@ def test_the_api_container_serves_the_test_stack(stack: tuple[Orthanc, str]) -> 
     assert body["database"]["name"] == "aiml02_results_test"
     with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/studies", timeout=30) as response:
         assert response.status == 200 and "studies" in json.loads(response.read())
+
+
+def test_the_frontend_container_serves_the_viewer_and_proxies_the_api(
+    stack: tuple[Orthanc, str],
+) -> None:
+    """The nginx container from docker-compose.frontend.yml, on the test stack's port."""
+    port = integration_values()["FRONTEND_PORT"]
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=10) as response:
+        page = response.read().decode()
+        headers = response.headers
+    assert '<div id="root">' in page and "For education only" in page
+    assert "default-src 'self'" in headers["Content-Security-Policy"]
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=10) as response:
+        body = json.loads(response.read())
+    print(f"frontend on 127.0.0.1:{port}, /api/health through nginx: {body}")
+    assert body["status"] == "ok" and body["orthanc"]["name"] == "aiml02-test"

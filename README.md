@@ -30,6 +30,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `configs/`: configuration
 - `data/`: local data, gitignored
 - `reports/`: classifier metrics JSON (after the Colab run)
+- `frontend/`: the React viewer (Vite, TypeScript), `docker-compose.frontend.yml`
 - `src/api/`: the viewer's read-only API (FastAPI), `Dockerfile.api`, `docker-compose.api.yml`
 - `migrations/`: numbered SQL for the results database, applied by `src/service/migrate.py`
 - `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `eda.md`,
@@ -337,6 +338,8 @@ that a wrong password is refused.
 | setting | demo stack | test stack |
 |---|---|---|
 | ports | 8042, 4242, 5434 | 18042, 14242, 15434 |
+| viewer API and frontend ports | 8000, 8080 | 18000, 18080 |
+| worker results folder | `results/worker` | `results/worker-test` |
 | Docker volumes | `aiml02_*` | `aiml02-test_*` |
 | Orthanc name | `aiml02` | `aiml02-test` |
 | database | `aiml02_results` | `aiml02_results_test` |
@@ -509,22 +512,46 @@ The test stack runs its own API on port 18000 (`API_PORT` in `.env.test`), with 
 folder. Tests: `tests/test_api.py` (fake Orthanc and database), `tests/test_api_packaging.py`
 (pins, image contents, ports, mounts), and `tests/test_api_integration.py` (test stack only: a
 study from upload to review, 503s, and the API container). An `.env.test` written before this
-change needs `API_PORT=18000` and `WORKER_RESULTS_DIR=./results/worker-test` added.
+change needs `API_PORT=18000`, `FRONTEND_PORT=18080` and
+`WORKER_RESULTS_DIR=./results/worker-test` added.
 
 ## Viewer (Step 6, in progress)
 
-A React viewer for the results the worker stores. For education only, not for clinical use. It
-uses the viewer API above. Planned features:
+`frontend/` is the React viewer (Vite, TypeScript). For education only, not for clinical use:
+every page carries the banner "For education only. Not for clinical use." The browser talks only
+to the viewer's origin; nginx serves the build and proxies `/api` to the API, so the browser
+never calls Orthanc and the frontend holds no credentials.
 
-- **Upload a scan:** a DICOM file goes into Orthanc, and the worker picks it up as a new stable
-  study. Demo or public de-identified data only.
-- **Scan and overlay:** show the scan with the AI overlay: Grad-CAM for DX, the spleen mask for CT.
-- **Score:** the confidence score, labelled as a model score rather than a calibrated
-  probability, with the threshold and the low-reliability flag from
-  `configs/viewer_thresholds.yaml`.
-- **Review:** Approve and Reject buttons for the reviewer. There is no login: the reviewer's
-  name is typed in and not verified, and the viewer says so.
-- **Audit log:** a record of every decision (who, when, which study, result and checkpoint).
+Built so far:
+
+- **Worklist:** patient ID, modality, processing status and review status as text badges (the
+  colour only repeats the text), source, updated time. It refreshes every 3 s only while a study
+  is being received or processed. If the API reports a service down (`/api/health` 503), it says
+  which one and why.
+- **DX view:** the image with the raw Grad-CAM map coloured in the browser (jet, as the worker)
+  and stretched over the whole image, as the model saw it (resized, not cropped). Overlay on/off,
+  opacity (default 0.45) and a label picker. The scores table lists the 14 labels with score,
+  threshold, above or below in text, the low-reliability badge, and Hernia as score only, under
+  the note that scores are not calibrated probabilities. Panels: known limits (from the Grad-CAM
+  demo and the test-split metrics) and model scope (NIH ChestX-ray14 frontal X-rays only).
+- **CT view:** the spleen volume from the U-Net mask. The slice view comes later.
+
+Planned: upload, review (Approve or Reject; there is no login, so the reviewer's name is typed in
+and not verified, and the viewer will say so), the audit log page, and the CT slice view.
+
+```
+docker compose -f docker-compose.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \
+    up -d --build --wait                  # http://127.0.0.1:8080 (FRONTEND_PORT)
+cd frontend && npm ci && npm run dev      # development: http://127.0.0.1:5173, /api -> :8000
+cd frontend && npm run typecheck && npm test
+```
+
+Tests (Vitest, CI job `frontend`): status and review badges, polling that stops when nothing is
+processing, the 503 message, the scores table (Hernia, flags), and the browser's colouring and
+blending, compared with the worker's stored overlay for DX 00000116_000 / Cardiomegaly at 0.45:
+max difference 2 grey levels per channel (fixtures from `scripts/export_blend_fixture.py`). The
+integration job also starts the frontend container and checks that it serves the viewer with a
+Content-Security-Policy and proxies `/api` to the test stack's API.
 
 ## Checks
 
