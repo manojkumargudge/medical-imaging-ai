@@ -164,7 +164,37 @@ def test_dx_study_gets_scores_thresholds_and_overlays(tmp_path: Path) -> None:
             assert entry["above_threshold"] == (entry["score"] >= entry["threshold"])
         with Image.open(tmp_path / "results" / entry["overlay"]) as overlay:
             assert overlay.size == (224, 224)
-        assert not Path(entry["overlay"]).is_absolute()
+        with Image.open(tmp_path / "results" / entry["cam"]) as cam:
+            assert (cam.size, cam.mode) == ((224, 224), "L")
+        assert not Path(entry["overlay"]).is_absolute() and not Path(entry["cam"]).is_absolute()
+
+
+def test_reblending_the_raw_cam_gives_the_stored_overlay(tmp_path: Path) -> None:
+    orthanc, store = FakeOrthanc(), MemoryStore()
+    ds = dx(13)
+    orthanc.add_study("s1", [ds])
+    analyzer = classifier()
+    Worker(orthanc, store, [analyzer], tmp_path, log=lambda _: None).poll_once()
+    seen, _ = gradcam.preprocess(to_png(ds), analyzer.params, CONFIG)
+    labels = store.rows[0]["results"]["instances"][0]["labels"]
+    worst = 0
+    for entry in labels.values():
+        with (
+            Image.open(tmp_path / entry["cam"]) as cam,
+            Image.open(tmp_path / entry["overlay"]) as stored,
+        ):
+            reblended = gradcam.overlay(seen, gradcam.cam_from_image(cam))
+            difference = np.abs(np.asarray(reblended, int) - np.asarray(stored, int)).max()
+        worst = max(worst, int(difference))
+    print(f"{len(labels)} labels, re-blended vs stored overlay: max pixel diff {worst}")
+    assert len(labels) == len(FINDINGS) and worst <= 1
+
+
+def test_the_raw_cam_keeps_the_map_within_one_grey_level() -> None:
+    cam = np.linspace(0, 1, 224 * 224, dtype=np.float32).reshape(224, 224)
+    back = gradcam.cam_from_image(gradcam.cam_image(cam))
+    assert np.abs(back - cam).max() <= 0.5 / 255 + 1e-7
+    assert gradcam.cam_image(np.full((2, 2), 1.5, np.float32)).getextrema() == (255, 255)
 
 
 def test_dx_scores_equal_the_gradcam_cli_path(tmp_path: Path) -> None:

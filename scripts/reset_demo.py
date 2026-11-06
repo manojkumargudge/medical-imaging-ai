@@ -6,6 +6,10 @@ Deletes, after showing the counts and asking for confirmation:
 - every row in the demo results table `inference_results`
 - the worker's output files under results/
 
+It keeps the viewer's tables (reviews, audit_log, uploads), and checks their row counts are the
+same afterwards. A review refers to its result row, so the reset refuses, before deleting
+anything, while any review exists.
+
 Then it uploads the demo studies again with scripts/upload_demo.py.
 
 The worker's place in Orthanc's change log is kept. Older changes refer to deleted studies,
@@ -42,6 +46,10 @@ class ResultStore(Protocol):
 
     def delete_results(self) -> int: ...
 
+    def count_kept(self) -> dict[str, int]: ...
+
+    def reviewed_results(self) -> int: ...
+
 
 def output_files(results_dir: Path) -> list[Path]:
     return sorted(path for path in results_dir.rglob("*") if path.is_file())
@@ -66,6 +74,11 @@ def reset(
     if store.database() != DEMO["db_name"]:
         raise RuntimeError(f"database {store.database()!r} is not {DEMO['db_name']!r}")
     check_results_dir(results_dir, allowed_root)
+    reviewed = store.reviewed_results()
+    if reviewed:
+        raise RuntimeError(
+            f"{reviewed} result rows have reviews, which are kept and refer to them; not resetting"
+        )
 
     studies: list[str] = orthanc.get_json("/studies")
     rows, files = store.count_results(), output_files(results_dir) if results_dir.exists() else []
@@ -73,7 +86,8 @@ def reset(
         f"Demo Orthanc {orthanc.url}: {len(studies)} studies; results database "
         f"{DEMO['db_name']}: {rows} rows; {results_dir}: {len(files)} files"
     )
-    print(f"before: {summary}")
+    kept = store.count_kept()
+    print(f"before: {summary}; kept: {kept}")
     if not confirm(f"Delete all of this and re-upload the demo studies? {summary}"):
         print("not confirmed; nothing deleted")
         return False
@@ -85,6 +99,10 @@ def reset(
         for child in results_dir.iterdir():
             shutil.rmtree(child) if child.is_dir() else child.unlink()
     print(f"deleted {len(studies)} studies, {deleted_rows} rows, {len(files)} files")
+    kept_after = store.count_kept()
+    print(f"kept tables: before {kept}, after {kept_after}")
+    if kept_after != kept:
+        raise RuntimeError(f"kept tables changed: before {kept}, after {kept_after}")
 
     uploaded = upload(orthanc)
     after: list[str] = orthanc.get_json("/studies")

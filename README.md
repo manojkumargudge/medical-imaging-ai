@@ -30,6 +30,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `configs/`: configuration
 - `data/`: local data, gitignored
 - `reports/`: classifier metrics JSON (after the Colab run)
+- `migrations/`: numbered SQL for the results database, applied by `src/service/migrate.py`
 - `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `eda.md`,
   `results.md`, `dicom-notes.md`
 
@@ -357,6 +358,10 @@ only. It deletes:
 - every row of `inference_results`
 - the worker's output files under `results/`
 
+It keeps the viewer's tables (`reviews`, `audit_log`, `uploads`) and checks that their row
+counts are unchanged. A review refers to its result row, so the reset refuses, before deleting
+anything, while any review exists.
+
 It then re-uploads with `upload_demo.py`. It shows the counts and asks you to type `wipe` before
 deleting anything. It checks that it is on the demo stack by Orthanc name and database name, and
 it keeps the worker's change-log position. Stop the worker before running it, and start it again
@@ -370,7 +375,9 @@ change sequence in the results database, so a restart resumes where it stopped. 
 - **DX/CR series:** the DenseNet121 classifier with Grad-CAM (all 14 labels). It records:
   - scores, which are not calibrated probabilities
   - the threshold, its set and the reliability flag from `configs/viewer_thresholds.yaml`
-  - one overlay PNG per label
+  - one overlay PNG per label (the map blended over the 224px image), and the raw Grad-CAM map
+    as an 8-bit grey 224px PNG (`cam`), so the viewer can colour and blend it itself.
+    Re-blending the raw map gives the stored overlay within 1 grey level.
   The 8-bit MONOCHROME2 images converted from NIH PNGs go through unchanged. Other DX images are
   windowed and scaled to 8 bits, which differs from the training data.
 - **CT series:** the 3D U-Net with the evaluation transforms and sliding-window inference. It
@@ -427,6 +434,39 @@ Tests:
   - DX: scores must equal the Grad-CAM JSON scores within 1e-6.
   - CT: Dice on `spleen_14` must match `segmentation_metrics.json` within 0.005.
 
+## Results database migrations
+
+The results database schema is in `migrations/`, as numbered SQL files applied in order by
+`src/service/migrate.py`. The table `schema_migrations` records each applied file and its
+sha256, and the runner refuses an applied file that has changed: add a new file instead.
+Migrations only add tables and triggers, and nothing in them drops or deletes data.
+
+- `001_initial.sql`: the worker's tables (`inference_results`, `worker_state`) with
+  `IF NOT EXISTS`, so it is a no-op on a database the worker created before migrations existed.
+- `002_reviews_audit_uploads.sql`: the viewer's tables.
+  - `reviews`: append-only. Decision `approve` or `reject`, reviewer required, comment required
+    on reject, a unique `submit_token` (one per opened review panel, so a double submit is
+    refused), and the reviewed `inference_results` row, which must belong to the same study.
+    A study's current review state is its newest row.
+  - `audit_log`: append-only. Events `upload`, `inference_done`, `inference_failed`, `review`.
+    A trigger on `inference_results` adds `inference_done` or `inference_failed` for every new
+    result row, in the same transaction.
+  - `uploads`: who uploaded what file (kind, size, sha256) and the resulting study.
+
+  Triggers refuse UPDATE, DELETE and TRUNCATE on `reviews` and `audit_log`. There is no login:
+  reviewer and uploader names are typed in and not verified.
+
+```
+python -m src.service.migrate --dry-run   # demo database (.env): list pending migrations
+python -m src.service.migrate             # apply; prints row counts before and after
+python -m src.service.migrate --env-file .env.test
+```
+
+`tests/test_migrate.py` checks file names, order and changed files without a database.
+`tests/test_migrations_integration.py` runs the migrations on the test stack inside a
+transaction that is rolled back: it checks an existing worker database keeps its rows, the
+review rules, the audit trigger, and the append-only triggers.
+
 ## Viewer (Step 6, planned, not built)
 
 A React viewer for the results the worker stores. For education only, not for clinical use. It
@@ -438,7 +478,8 @@ will need a small API of its own, because there is none yet. Planned features:
 - **Score:** the confidence score, labelled as a model score rather than a calibrated
   probability, with the threshold and the low-reliability flag from
   `configs/viewer_thresholds.yaml`.
-- **Review:** Approve and Reject buttons for the reviewer.
+- **Review:** Approve and Reject buttons for the reviewer. There is no login: the reviewer's
+  name is typed in and not verified, and the viewer says so.
 - **Audit log:** a record of every decision (who, when, which study, result and checkpoint).
 
 ## Checks

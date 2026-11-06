@@ -1,5 +1,8 @@
 """Where the worker keeps results and its place in Orthanc's change log.
 
+The schema is migrations/001 (src/service/migrate.py); SCHEMA here is the same SQL, so the
+worker and the tests' temporary tables work on a database that was not migrated yet.
+
 One row per (StudyInstanceUID, checkpoint sha256): a rerun, or a second StableStudy for the same
 study, inserts nothing new. The last processed change sequence is stored too, so a restarted
 worker resumes where it stopped. PostgresStore is the real store; MemoryStore is for tests.
@@ -13,6 +16,8 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 SEQ_KEY = "orthanc_last_change_seq"
+# The viewer's tables (migrations/002); scripts/reset_demo.py keeps them.
+KEPT_TABLES = ("reviews", "audit_log", "uploads")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS inference_results (
@@ -151,6 +156,31 @@ class PostgresStore:
     def delete_results(self) -> int:
         """Delete every result row (scripts/reset_demo.py only); the change seq is kept."""
         return self.connection.execute("DELETE FROM inference_results").rowcount
+
+    def _exists(self, table: str) -> bool:
+        row = self.connection.execute("SELECT to_regclass(%s)", (table,)).fetchone()
+        return row is not None and row[0] is not None
+
+    def count_kept(self) -> dict[str, int]:
+        """Rows in each of the viewer's tables that exists (none before migration 002)."""
+        from psycopg import sql
+
+        counts = {}
+        for table in KEPT_TABLES:
+            if self._exists(table):
+                query = sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(table))
+                row = self.connection.execute(query).fetchone()
+                counts[table] = int(row[0]) if row else 0
+        return counts
+
+    def reviewed_results(self) -> int:
+        """Result rows that at least one review refers to."""
+        if not self._exists("reviews"):
+            return 0
+        row = self.connection.execute(
+            "SELECT count(DISTINCT inference_result_id) FROM reviews"
+        ).fetchone()
+        return int(row[0]) if row else 0
 
     def rows(self) -> list[dict[str, Any]]:
         cursor = self.connection.execute(

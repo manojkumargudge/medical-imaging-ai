@@ -108,6 +108,18 @@ def overlay(image: Image.Image, cam: NDArray[np.float32]) -> Image.Image:
     return Image.fromarray(blended.round().astype(np.uint8))
 
 
+def cam_image(cam: NDArray[np.float32]) -> Image.Image:
+    """The raw map as an 8-bit grey image (0-255 for 0-1), for a viewer to colour itself.
+
+    Re-blending it with `overlay` gives the stored overlay within 1 grey level."""
+    return Image.fromarray(np.round(np.clip(cam, 0, 1) * 255).astype(np.uint8), mode="L")
+
+
+def cam_from_image(image: Image.Image) -> NDArray[np.float32]:
+    values: NDArray[np.float32] = np.asarray(image.convert("L"), dtype=np.float32) / np.float32(255)
+    return values
+
+
 def viewer_entry(path: Path, label: str) -> dict[str, Any]:
     entry: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))["labels"][label]
     return entry

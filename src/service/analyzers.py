@@ -3,7 +3,9 @@
 Both reuse the evaluation code: the classifier's `resize_png` + test-split transform (through
 src/explain/gradcam.py), and the U-Net's evaluation transforms with sliding-window inference.
 CPU only. Output files go under `<results_dir>/<study UID>/<model>/` and are stored as paths
-relative to results_dir. For education only, not for clinical use.
+relative to results_dir. For DX, each label gets the blended overlay (`overlay`) and the raw
+Grad-CAM map as an 8-bit grey 224px PNG (`cam`), which a viewer colours and blends itself. For
+education only, not for clinical use.
 """
 
 from __future__ import annotations
@@ -133,6 +135,8 @@ class ClassifierAnalyzer:
             path = out_dir / f"{sop}_{label}.png"
             path.parent.mkdir(parents=True, exist_ok=True)
             gradcam.overlay(seen, result.cam).save(path, format="PNG")
+            cam_path = out_dir / f"{sop}_{label}_cam.png"
+            gradcam.cam_image(result.cam).save(cam_path, format="PNG")
             entry = self.viewer[label]
             threshold = entry["threshold"]
             labels[label] = {
@@ -142,6 +146,7 @@ class ClassifierAnalyzer:
                 "low_reliability": entry["low_reliability"],
                 "above_threshold": None if threshold is None else result.score >= threshold,
                 "overlay": path.relative_to(root).as_posix(),
+                "cam": cam_path.relative_to(root).as_posix(),
             }
         return {
             "sop_instance_uid": sop,
