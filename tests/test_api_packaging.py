@@ -28,7 +28,7 @@ def test_requirements_api_pins_match_pyproject() -> None:
     print(f"requirements-api.txt: {image}")
     assert image and {"fastapi", "uvicorn"} <= set(image)
     assert {name: declared.get(name) for name in image} == image
-    assert not {"torch", "torchvision", "monai", "nibabel"} & set(image)
+    assert not {"torch", "torchvision", "monai"} & set(image)
 
 
 def test_the_api_image_copies_code_and_configs_only() -> None:
@@ -46,7 +46,10 @@ def test_the_api_service_is_local_only_and_holds_the_orthanc_credentials() -> No
     )
     api = compose["services"]["api"]
     assert api["ports"] == ["127.0.0.1:${API_PORT:-8000}:8000"]
-    assert api["volumes"] == ["${WORKER_RESULTS_DIR:-./results/worker}:/results:ro"]
+    assert api["volumes"] == [
+        "${WORKER_RESULTS_DIR:-./results/worker}:/results:ro",  # worker outputs: read-only
+        "${API_CACHE_DIR:-./results/api-cache}:/cache",  # CT masks on the DICOM grid
+    ]
     environment = api["environment"]
     # Credentials come from the env file at run time, never written into the file.
     assert environment["ORTHANC_USER"] == "${ORTHANC_USER}"
@@ -85,3 +88,4 @@ def test_the_test_stack_api_has_its_own_port_and_results_folder() -> None:
     assert TEST_SETTINGS["API_PORT"] != "8000"
     assert TEST_SETTINGS["FRONTEND_PORT"] != "8080"
     assert TEST_SETTINGS["WORKER_RESULTS_DIR"] != "./results/worker"
+    assert TEST_SETTINGS["API_CACHE_DIR"] != "./results/api-cache"

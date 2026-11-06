@@ -15,7 +15,8 @@ transaction.
   nothing. Otherwise the rows are written only after Orthanc has stored the study.
 
 Environment: ORTHANC_URL, ORTHANC_USER, ORTHANC_PASSWORD, RESULTS_DB_URL, RESULTS_DIR (the
-worker's output folder, read-only), VIEWER_THRESHOLDS. For education only, not for clinical use.
+worker's output folder, read-only), VIEWER_THRESHOLDS, CT_CACHE_DIR (writable: CT masks resampled to
+the DICOM grid, as .npz). For education only, not for clinical use.
 
 Run: uvicorn src.api.app:create_app --factory --host 127.0.0.1 --port 8000
 """
@@ -27,19 +28,22 @@ import io
 import os
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal, TypeVar
 from uuid import UUID
 
+import numpy as np
 import yaml
 from fastapi import FastAPI, Form, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 from pydicom import dcmread
 
+from src.api import ct as ct_view
 from src.api import studies, uploads
 from src.api.db import (
     Database,
@@ -52,10 +56,11 @@ from src.api.db import (
 )
 from src.dicom.render import to_png
 from src.service.orthanc import Orthanc, OrthancError
-from src.service.stack import DEMO, TEST
+from src.service.stack import DEMO, TEST, demo_study_uids
 
 T = TypeVar("T")
 ORTHANC_TIMEOUT = 10.0
+DEMO_UIDS = demo_study_uids()
 
 
 class OrthancUnavailableError(RuntimeError):
@@ -68,10 +73,60 @@ class Services:
     db: Database
     results_dir: Path
     thresholds: dict[str, Any]
+    ct: ct_view.CtCache = field(default_factory=ct_view.CtCache)
 
     @property
     def labels(self) -> list[str]:
         return list(self.thresholds["labels"])
+
+    def inside_results(self, relative: str) -> Path:
+        """A stored output path, resolved inside the results folder, or 404."""
+        root = self.results_dir.resolve()
+        path = (root / relative).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            raise HTTPException(404, "result file not found")
+        return path
+
+    def ct_grid(self, study_id: str) -> tuple[str, ct_view.Geometry, dict[str, Any] | None]:
+        """The study UID, its CT grid (slices in patient order) and its newest segmentation
+        row (None if there is none)."""
+        study = self.known_study(study_id)
+        uid = str(study["MainDicomTags"].get("StudyInstanceUID", ""))
+        rows = [r for r in self.db.newest_results(uid) if r["model"] == studies.SEGMENTATION]
+        row = rows[0] if rows else None
+        grid = self.ct.geometries.get(study_id)
+        if grid is None:
+            series = [
+                x
+                for x in self.get_json(f"/studies/{study_id}/series")
+                if x["MainDicomTags"].get("Modality") == "CT"
+            ]
+            if not series:
+                raise HTTPException(404, "this study has no CT series")
+            instances = self.get_json(f"/series/{series[0]['ID']}/instances")
+            header = dcmread(
+                io.BytesIO(self.get_bytes(f"/instances/{instances[0]['ID']}/file")),
+                stop_before_pixels=True,
+            )
+            grid = ct_view.geometry(instances, header)
+            if study.get("IsStable"):  # no more slices will arrive
+                self.ct.geometries[study_id] = grid
+        return uid, grid, row
+
+    def ct_mask(
+        self, uid: str, grid: ct_view.Geometry, row: dict[str, Any] | None
+    ) -> NDArray[np.uint8] | None:
+        if row is None or row["status"] != "ok":
+            return None
+        try:
+            relative = str(row["results"]["series"][0]["mask"])
+        except (KeyError, IndexError, TypeError):
+            return None
+        try:
+            path = self.inside_results(relative)
+        except HTTPException:  # the file is gone (e.g. outputs moved): slices without a mask
+            return None
+        return self.ct.mask_on_grid(uid, path, grid)
 
     def call_orthanc(self, call: Callable[[str], T], path: str) -> T:
         try:
@@ -142,6 +197,7 @@ def services_from_env() -> Services:
         load_thresholds(
             Path(os.environ.get("VIEWER_THRESHOLDS", "configs/viewer_thresholds.yaml"))
         ),
+        ct_view.CtCache(Path(os.environ.get("CT_CACHE_DIR", "results/api-cache"))),
     )
 
 
@@ -175,7 +231,7 @@ def summary(
             bool(study["IsStable"]), modalities, {row["model"]: row["status"] for row in results}
         ),
         "review_status": studies.review_status(review["decision"] if review else None),
-        "source": "upload" if {study["ID"], study_uid} & uploaded else "demo",
+        "source": studies.source(study["ID"], study_uid, uploaded, DEMO_UIDS),
         "summary": studies.result_summary(results, thresholds["labels"]),
         "updated_at": iso(max(times)),
     }
@@ -440,6 +496,66 @@ def create_app(services: Services | None = None) -> FastAPI:
             "total": total,
             "notice": studies.NOTICE,
         }
+
+    @app.get("/api/studies/{study_id}/ct/meta")
+    def ct_meta(study_id: str) -> dict[str, Any]:
+        s = svc()
+        uid, grid, row = s.ct_grid(study_id)
+        mask = s.ct_mask(uid, grid, row)
+        with_mask = np.flatnonzero(mask.any(axis=(0, 1))) if mask is not None else np.array([])
+        stored_ml = None
+        if row is not None and row["status"] == "ok":
+            stored_ml = sum(x["spleen_ml"] for x in row["results"].get("series", []))
+        return {
+            "slices": grid.shape[2],
+            "columns": grid.shape[0],
+            "rows": grid.shape[1],
+            "slice_index": "0-based, in patient order along the slice normal",
+            "window": {"center": ct_view.WINDOW_CENTER, "width": ct_view.WINDOW_WIDTH},
+            "mask": mask is not None,
+            "first_mask_slice": int(with_mask[0]) if with_mask.size else None,
+            "last_mask_slice": int(with_mask[-1]) if with_mask.size else None,
+            "spleen_ml": stored_ml,
+            "spleen_ml_dicom_grid": (
+                round(float(mask.sum()) * grid.voxel_ml, 3) if mask is not None else None
+            ),
+            "result_id": row["id"] if row else None,
+            "notice": studies.NOTICE,
+        }
+
+    def slice_index(grid: ct_view.Geometry, k: int) -> int:
+        if not 0 <= k < grid.shape[2]:
+            raise HTTPException(404, f"slice {k} is out of range (0 to {grid.shape[2] - 1})")
+        return k
+
+    @app.get("/api/studies/{study_id}/ct/slice/{k}")
+    def ct_slice(study_id: str, k: int) -> Response:
+        s = svc()
+        _, grid, _ = s.ct_grid(study_id)
+        instance = grid.instance_ids[slice_index(grid, k)]
+        png = s.ct.slice_png((instance, k))
+        if png is None:
+            png = ct_view.windowed_png(
+                dcmread(io.BytesIO(s.get_bytes(f"/instances/{instance}/file")))
+            )
+            s.ct.keep_slice((instance, k), png)
+        return Response(
+            png, media_type="image/png", headers={"Cache-Control": "private, max-age=300"}
+        )
+
+    @app.get("/api/studies/{study_id}/ct/mask/{k}")
+    def ct_mask(study_id: str, k: int) -> Response:
+        s = svc()
+        uid, grid, row = s.ct_grid(study_id)
+        index = slice_index(grid, k)
+        mask = s.ct_mask(uid, grid, row)
+        if mask is None:
+            raise HTTPException(404, "no spleen mask for this study")
+        return Response(
+            ct_view.mask_png(mask[:, :, index]),
+            media_type="image/png",
+            headers={"Cache-Control": "private, max-age=300"},
+        )
 
     @app.get("/api/config/thresholds")
     def thresholds() -> dict[str, Any]:

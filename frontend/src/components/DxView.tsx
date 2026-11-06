@@ -94,7 +94,7 @@ export function DxView({
         DX study, patient {detail.study.patient_id}{" "}
         <BadgeView badge={statusBadge(detail.study.status)} />
       </h1>
-      {detail.study.source === "upload" && <ScopeWarning />}
+      {detail.study.source !== "demo" && <ScopeWarning />}
       {!result && (
         <p>No classifier result for this study yet. The image is shown without an overlay.</p>
       )}

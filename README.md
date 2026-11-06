@@ -493,6 +493,9 @@ nowhere else. The port is bound to 127.0.0.1.
 | `GET /api/studies/{id}/reviews` | the study's reviews, newest first |
 | `POST /api/studies/{id}/reviews` | save a review: `decision` (`approve` or `reject`), `reviewer`, `comment` (required to reject), `submit_token` (a UUID), `inference_result_id` (the result the reviewer saw) |
 | `GET /api/audit?page=&page_size=` | the audit log, newest first, paged (at most 200 per page) |
+| `GET /api/studies/{id}/ct/meta` | slice count, window 40/400, whether a mask exists, the first and last slice with mask, the stored spleen volume and the volume of the mask on the DICOM grid |
+| `GET /api/studies/{id}/ct/slice/{k}` | slice k (0-based, in patient order) as an 8-bit PNG, window 40/400 |
+| `GET /api/studies/{id}/ct/mask/{k}` | the spleen mask on slice k as a transparent PNG; 404 if k is out of range |
 | `POST /api/uploads` | one file (`file`) and the uploader's name (`uploader`): a PNG or a DX/CR DICOM, stored in Orthanc as a new study |
 
 An upload is checked by its content, never by its name (`src/api/uploads.py`):
@@ -527,7 +530,19 @@ the spleen volume from the mask.
 Processing status: `receiving` (Orthanc has not marked the study stable), `processing` (stable,
 no result row yet for a model that should run), `done`, `failed` (the newest row is an error),
 `no_model` (no DX, CR or CT series). Review status is the newest review: `none`, `approved` or
-`rejected`. Source is `upload` if the study is in `uploads`, otherwise `demo`.
+`rejected`. Source is `upload` if the study is in `uploads`, `demo` if its StudyInstanceUID is
+one of the demo studies (`DEMO_NIH_IMAGES` and `DEMO_SPLEEN_CASE` in `src/service/stack.py`, the
+list `upload_demo.py` and `reset_demo.py` use), and `unknown` otherwise. The viewer shows the
+model-scope warning for every study that is not a demo study.
+
+CT (`src/api/ct.py`): slices are ordered by ImagePositionPatient along the slice normal, never by
+InstanceNumber. The worker's mask is in the model's space (RAS, 1.5 mm, cropped); the API puts it
+on the DICOM grid by nearest neighbour through both affines, once per mask file and grid, and
+caches the result as `.npz` in `CT_CACHE_DIR` (`results/api-cache`, the API's only writable
+folder; the worker outputs stay read-only). Slice PNGs are cached in memory. Checked on the real
+`spleen_14` (`tests/test_ct_real.py`, skipped without the data): the mask on the DICOM grid is
+441.9 mL against 440.8 mL stored (+0.26%), and its Dice against the ground-truth label on the
+same grid is 0.9673 (0.9579 reported on the 1.5 mm grid), so the orientation is right.
 
 Safety checks:
 
@@ -537,7 +552,7 @@ Safety checks:
 - Orthanc or the database down, or Orthanc refusing the credentials: 503, with a message
   naming the service and the reason.
 
-The API image (`Dockerfile.api`, `requirements-api.txt`) has no torch, MONAI or nibabel.
+The API image (`Dockerfile.api`, `requirements-api.txt`) has no torch or MONAI; nibabel reads the CT masks.
 
 ```
 python -m src.service.migrate                         # once: the API reads the viewer's tables
@@ -572,7 +587,10 @@ Built so far:
   threshold, above or below in text, the low-reliability badge, and Hernia as score only, under
   the note that scores are not calibrated probabilities. Panels: known limits (from the Grad-CAM
   demo and the test-split metrics) and model scope (NIH ChestX-ray14 frontal X-rays only).
-- **CT view:** the spleen volume from the U-Net mask. The slice view comes later.
+- **CT view:** the slices with a slider ("k / N"), arrow keys, previous and next, "jump to
+  spleen" (the first slice with mask), the spleen mask on or off with an opacity slider, and the
+  spleen volume. The next and previous slices are loaded ahead. `?slice=<n>` (1-based) opens a
+  given slice.
 - **Review panel** (DX and CT): Approve or Reject, with neither selected at first; the
   reviewer's name; a comment, required to reject. Save is enabled only when that is complete,
   and only a click saves: there is no form, so Enter never submits. The button is disabled while
@@ -587,7 +605,6 @@ Built so far:
   The upload page, and the DX view of an uploaded study, warn: "Trained on NIH ChestX-ray14
   frontal chest X-rays. Scores for other images have no meaning."
 
-Planned: the CT slice view.
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \

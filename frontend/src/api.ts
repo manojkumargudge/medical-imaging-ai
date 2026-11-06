@@ -12,7 +12,7 @@ export interface StudySummary {
   summary: string | null;
   status: ProcessingStatus;
   review_status: ReviewStatus;
-  source: "demo" | "upload";
+  source: "demo" | "upload" | "unknown"; // demo: one of the demo studies, by UID
   updated_at: string | null;
 }
 
@@ -95,6 +95,19 @@ export interface AuditPage {
   page: number;
   page_size: number;
   total: number;
+}
+
+export interface CtMeta {
+  slices: number;
+  columns: number;
+  rows: number;
+  window: { center: number; width: number };
+  mask: boolean;
+  first_mask_slice: number | null; // 0-based
+  last_mask_slice: number | null;
+  spleen_ml: number | null;
+  spleen_ml_dicom_grid: number | null;
+  result_id: number | null;
 }
 
 export const CLASSIFIER = "densenet121-chestxray14";
