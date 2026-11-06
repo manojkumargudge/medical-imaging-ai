@@ -4,6 +4,8 @@
   docs/figures/gradcam/<image>_<label>.json must equal the Grad-CAM CLI score. Tolerance 1e-6:
   both runs use the same weights and preprocessing on CPU, so only float differences between
   torch builds (laptop wheel vs the worker image) are allowed. The overlay pixels are compared too.
+  For every label, the raw Grad-CAM PNG must exist, and re-blending it over the 224px image must
+  give the stored overlay within 1 grey level (8-bit rounding of the map).
 - CT: Dice between the worker's mask and the reference label must match the Dice in
   reports/segmentation_metrics.json. The label goes through the evaluation transforms (RAS,
   1.5 mm, body crop), as in the evaluation, so the two grids must agree. Tolerance 0.005: the
@@ -31,8 +33,11 @@ from PIL import Image
 from pydicom import dcmread
 
 from scripts.upload_demo import DATA_ENTRY, DEFAULT_PNGS, DEFAULT_SPLEEN_CASE, dx_from_png
+from src.data.preprocess import read_params
 from src.dicom import convert
+from src.explain import gradcam
 from src.models.segmentation import build_transforms, load_seg_config
+from src.service.analyzers import to_png
 from src.service.orthanc import load_env
 from src.service.store import PostgresStore
 
@@ -41,6 +46,7 @@ SEG_METRICS = Path("reports/segmentation_metrics.json")
 TASK = Path("data/raw/Task09_Spleen")
 DX_TOLERANCE = 1e-6
 DICE_TOLERANCE = 0.005
+CAM_TOLERANCE = 1
 
 
 def dice(a: np.ndarray[Any, Any], b: np.ndarray[Any, Any]) -> float:
@@ -49,8 +55,33 @@ def dice(a: np.ndarray[Any, Any], b: np.ndarray[Any, Any]) -> float:
     return float(2 * (a & b).sum() / total) if total else 1.0
 
 
+def check_raw_cams(labels: dict[str, Any], results_dir: Path, ds: Any, name: str) -> bool:
+    seen, _ = gradcam.preprocess(
+        to_png(ds), read_params(Path("params.yaml")), Path("configs/classifier.yaml")
+    )
+    worst, missing = 0, [label for label, entry in labels.items() if "cam" not in entry]
+    for entry in labels.values():
+        if "cam" not in entry:
+            continue
+        with (
+            Image.open(results_dir / entry["cam"]) as cam,
+            Image.open(results_dir / entry["overlay"]) as stored,
+        ):
+            reblended = gradcam.overlay(seen, gradcam.cam_from_image(cam))
+            difference = np.abs(np.asarray(reblended, int) - np.asarray(stored, int)).max()
+        worst = max(worst, int(difference))
+    ok = bool(labels) and not missing and worst <= CAM_TOLERANCE
+    print(
+        f"DX {name} raw CAMs: {len(labels) - len(missing)} of {len(labels)} labels; re-blended "
+        f"vs stored overlay max pixel diff {worst} (tolerance {CAM_TOLERANCE}) -> "
+        f"{'OK' if ok else 'FAIL'}"
+    )
+    return ok
+
+
 def check_dx(rows: dict[str, dict[str, Any]], results_dir: Path, png: Path) -> bool:
-    study_uid = str(dx_from_png(png, DATA_ENTRY).StudyInstanceUID)
+    ds = dx_from_png(png, DATA_ENTRY)
+    study_uid = str(ds.StudyInstanceUID)
     row = rows[study_uid]
     [instance] = row["results"]["instances"]
     [cli_path] = sorted(GRADCAM.glob(f"{png.stem}_*.json"))
@@ -69,7 +100,7 @@ def check_dx(rows: dict[str, dict[str, Any]], results_dir: Path, png: Path) -> b
         f"{worker['threshold']} vs {cli['threshold']}; overlay max pixel diff {pixels} -> "
         f"{'OK' if ok else 'FAIL'}"
     )
-    return bool(ok)
+    return bool(ok) and check_raw_cams(instance["labels"], results_dir, ds, png.stem)
 
 
 def check_ct(rows: dict[str, dict[str, Any]], results_dir: Path, case: str) -> bool:

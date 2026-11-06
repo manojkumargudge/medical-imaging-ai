@@ -32,6 +32,8 @@ class FakeStore:
     name: str = DEMO["db_name"]
     rows: int = 5
     deleted: list[int] = field(default_factory=list)
+    kept: dict[str, int] = field(default_factory=lambda: {"reviews": 0, "audit_log": 7})
+    reviewed: int = 0
 
     def database(self) -> str:
         return self.name
@@ -43,6 +45,12 @@ class FakeStore:
         self.deleted.append(self.rows)
         self.rows = 0
         return self.deleted[-1]
+
+    def count_kept(self) -> dict[str, int]:
+        return dict(self.kept)
+
+    def reviewed_results(self) -> int:
+        return self.reviewed
 
 
 def uploader(orthanc: Orthanc) -> list[str]:
@@ -126,6 +134,32 @@ def test_files_are_deleted_only_inside_results(tmp_path: Path, where: str) -> No
             FakeOrthanc(DEMO["orthanc_name"], ["a"]),
             FakeStore(),
             folder,
+            uploader,
+            lambda _: True,
+            tmp_path / "results",
+        )
+
+
+def test_a_reviewed_result_stops_the_reset_before_anything_is_deleted(tmp_path: Path) -> None:
+    orthanc = FakeOrthanc(DEMO["orthanc_name"], ["a", "b"])
+    store, folder = FakeStore(reviewed=1), results(tmp_path)
+    with pytest.raises(RuntimeError, match="have reviews"):
+        reset_demo.reset(orthanc, store, folder, uploader, lambda _: True, tmp_path / "results")
+    assert orthanc.state["studies"] == ["a", "b"] and store.rows == 5  # type: ignore[attr-defined]
+    assert len(reset_demo.output_files(folder)) == 1
+
+
+def test_the_kept_tables_must_not_change(tmp_path: Path) -> None:
+    class Shrinking(FakeStore):
+        def delete_results(self) -> int:
+            self.kept["audit_log"] -= 1
+            return super().delete_results()
+
+    with pytest.raises(RuntimeError, match="kept tables changed"):
+        reset_demo.reset(
+            FakeOrthanc(DEMO["orthanc_name"], ["a"]),
+            Shrinking(),
+            results(tmp_path),
             uploader,
             lambda _: True,
             tmp_path / "results",

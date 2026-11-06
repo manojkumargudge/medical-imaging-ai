@@ -64,3 +64,6 @@ temp/
 
 # Worker outputs (overlays, masks) from docker-compose.worker.yml
 /results/
+
+# Database dumps and pre-change copies (may hold demo data)
+/backups/
