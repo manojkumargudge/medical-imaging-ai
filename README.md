@@ -31,12 +31,45 @@ with an audit log. Results are measured on named splits only: the classifier in
 
 ## Quick start: the whole demo stack
 
-```
-cp .env.example .env                # set the passwords and the two checkpoint paths
-docker compose up -d --build --wait # Orthanc, results DB, worker, API, frontend
-python -m src.service.migrate       # once, with the stack up: the viewer's tables and triggers
-python -m scripts.upload_demo       # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
-```
+From a fresh clone, on Windows (PowerShell); prerequisites under [Setup](#setup). The models are
+not trained here: training runs on Colab only (see Data versioning and the notebooks). Times are
+what a fresh clone took on the development laptop.
+
+1. **Python environment** (about 15 min the first time, mostly torch):
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\python -m pip install -e ".[dev,api]"
+   ```
+2. **Checkpoints.** Copy the two trained checkpoints from the Drive folder `MyDrive/aiml02-runs/`
+   (`classifier/epoch_003.pt`, `segmentation/epoch_180.pt`) to `C:\aiml02-checkpoints\`, outside
+   the repository. Their sha256 values are listed under Inference worker.
+3. **Settings:**
+   ```powershell
+   Copy-Item .env.example .env   # then set ORTHANC_PASSWORD and RESULTS_DB_PASSWORD
+   ```
+   The checkpoint paths in `.env.example` already point to `C:\aiml02-checkpoints\`. To run a
+   second copy of the stack, stop the first one and add `COMPOSE_PROJECT_NAME=<another name>`
+   to its `.env`, so its containers and volumes are separate (the ports are the same).
+4. **Demo data** (the Kaggle downloads need no account):
+   ```powershell
+   .venv\Scripts\kaggle datasets download nih-chest-xrays/data -f Data_Entry_2017.csv -p data/raw
+   Expand-Archive data/raw/Data_Entry_2017.csv.zip -DestinationPath data/raw
+   foreach ($f in "00000116_000.png", "00000013_021.png") {
+       .venv\Scripts\kaggle datasets download nih-chest-xrays/data -f "images_001/images/$f" -p data/raw/demo
+   }
+   .venv\Scripts\python -m src.data.spleen download --root data/raw   # about 1.5 GB, 12 min
+   ```
+   `-p data/raw/demo` is right: Kaggle keeps the `images_001/images/` part of the path.
+5. **Start, migrate, load** (the first `--build` took about 13 min; later starts take under a
+   minute):
+   ```powershell
+   docker compose up -d --build --wait     # Orthanc, results DB, worker, API, frontend
+   .venv\Scripts\python -m src.service.migrate   # once, with the stack up
+   .venv\Scripts\python -m scripts.upload_demo   # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
+   ```
+   The worker processes the 3 studies in about 90 s; the worklist shows them as Done.
+6. **Checks:** `.venv\Scripts\python -m pytest` (330 passed, 28 skipped on a fresh clone: the
+   skipped tests need the full datasets or the integration test stack).
 
 Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
@@ -58,10 +91,9 @@ them.
   evaluation), 3D U-Net segmentation (`segmentation.py`), shared checkpoint helpers
 - `configs/classifier.yaml`, `configs/segmentation.yaml`: the fixed training configs
 - `src/explain/gradcam.py`: Grad-CAM overlays for the classifier
-- `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab (not
-  run yet)
-- `notebooks/colab_train.ipynb`: train and evaluate on a Colab GPU (not run yet)
-- `notebooks/colab_seg.ipynb`: 3D U-Net training and evaluation on a Colab GPU (not run yet)
+- `notebooks/colab_preprocess.ipynb`: download, `dvc repro preprocess`, `dvc push` on Colab
+- `notebooks/colab_train.ipynb`: train and evaluate the classifier on a Colab GPU
+- `notebooks/colab_seg.ipynb`: 3D U-Net training and evaluation on a Colab GPU
 - `dvc.yaml`, `params.yaml`: DVC pipeline (stages `split`, `preprocess`, `seg_split`)
 - `tests/`: pytest tests
 - `configs/`: configuration
@@ -83,6 +115,10 @@ or a later 22.x (`frontend/.nvmrc`; `package.json` `engines` is `>=22.22.2 <23`)
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev,api]"
 ```
+
+On Linux or macOS, install with the CPU-only PyTorch index, as CI does, or pip fetches the CUDA
+builds (several GB): `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu pip install -e
+".[dev,api]"`.
 
 ## Data
 
@@ -227,7 +263,7 @@ there. It asserts that the data path is not under `/content/drive`.
 | **Total** | | **about 4.0 GB** |
 
 The NIH sizes are from the Colab preprocess run (`dvc.lock`). The checkpoint sizes were measured
-locally by saving one checkpoint of each model; no training has run, so none are on Drive yet. The preprocess notebook still checks for about 7 GB
+locally by saving one checkpoint of each model, before training. The preprocess notebook still checks for about 7 GB
 free on Drive, because it was written with the earlier 6 GB shard estimate; the real need is about
 2.4 GB.
 
