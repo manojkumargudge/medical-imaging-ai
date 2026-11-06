@@ -1,4 +1,4 @@
-"""The worker against the real Orthanc and Postgres from docker-compose.yml, with fake models.
+"""The worker against the real Orthanc and Postgres from docker-compose.base.yml, with fake models.
 
 Runs only with AIML02_INTEGRATION=1 against the test stack (.env.test, compose project
 aiml02-test), never the demo; Orthanc and database names are checked first. Results go to

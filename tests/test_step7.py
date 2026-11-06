@@ -18,7 +18,7 @@ from src.service.worker import Worker
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FILES = [
-    "docker-compose.yml",
+    "docker-compose.base.yml",
     "docker-compose.worker.yml",
     "docker-compose.api.yml",
     "docker-compose.frontend.yml",
@@ -115,3 +115,10 @@ def test_the_notice_is_in_the_readme_health_and_openapi(tmp_path: Path) -> None:
     )
     assert client.get("/api/health").json()["notice"] == NOTICE
     assert NOTICE in client.get("/openapi.json").json()["info"]["description"]
+
+
+def test_docs_openapi_json_matches_the_api() -> None:
+    from scripts import export_openapi
+
+    stored = (REPO_ROOT / "docs" / "openapi.json").read_text(encoding="utf-8")
+    assert stored == export_openapi.document(), "run python -m scripts.export_openapi"

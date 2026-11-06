@@ -1,9 +1,9 @@
-# The viewer (React build served by nginx, /api proxied to the API), added to docker-compose.yml
+# The viewer (React build served by nginx, /api proxied to the API), added to docker-compose.base.yml
 # and docker-compose.api.yml. Demo:
-#   docker compose -f docker-compose.yml -f docker-compose.api.yml \
+#   docker compose -f docker-compose.base.yml -f docker-compose.api.yml \
 #       -f docker-compose.frontend.yml up -d --build --wait
 # Test stack (its own ports from .env.test):
-#   docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+#   docker compose -p aiml02-test --env-file .env.test -f docker-compose.base.yml \
 #       -f docker-compose.api.yml -f docker-compose.frontend.yml up -d --build --wait
 # No credentials here: the frontend talks only to the API. Port bound to 127.0.0.1 only.
 # For education only, not for clinical use.

@@ -17,9 +17,9 @@ which the worker skips, and the new uploads are processed as usual.
 
 Only the demo stack: Orthanc must report the demo name and the database must be the demo
 database. Stop the worker first, and start it again afterwards:
-    docker compose -f docker-compose.yml -f docker-compose.worker.yml stop worker
+    docker compose -f docker-compose.base.yml -f docker-compose.worker.yml stop worker
     python -m scripts.reset_demo
-    docker compose -f docker-compose.yml -f docker-compose.worker.yml start worker
+    docker compose -f docker-compose.base.yml -f docker-compose.worker.yml start worker
 """
 
 from __future__ import annotations

@@ -54,7 +54,7 @@ jobs:
         run: npm run build
 
   integration:
-    # Orthanc and the results Postgres from docker-compose.yml as the separate test project
+    # Orthanc and the results Postgres from docker-compose.base.yml as the separate test project
     # (aiml02-test, .env.test), with synthetic data only.
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +72,7 @@ jobs:
         # With the API (Dockerfile.api) and frontend (frontend/Dockerfile) containers.
         run: |
           python -m scripts.make_test_env
-          docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+          docker compose -p aiml02-test --env-file .env.test -f docker-compose.base.yml \
             -f docker-compose.api.yml -f docker-compose.frontend.yml up -d --build --wait
           python -m src.service.migrate --env-file .env.test
       - name: Integration tests
@@ -82,5 +82,5 @@ jobs:
       - name: Service logs
         if: failure()
         run: |
-          docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+          docker compose -p aiml02-test --env-file .env.test -f docker-compose.base.yml \
             -f docker-compose.api.yml -f docker-compose.frontend.yml logs
