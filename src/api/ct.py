@@ -9,6 +9,13 @@
   voxel at the same patient position (inverse mask affine x DICOM affine). Outside the mask's
   box is 0. The result is computed once per (mask file, geometry) and cached as .npz.
 - Slice PNGs use the CT window 40/400 (HU -160 to 240).
+- Display: a slice and its mask PNG go through the same `orient` (one transform for both), so
+  every series shows like a standard axial view: anterior up, the patient's right on the image's
+  left. In DICOM's patient frame (LPS: +x left, +y posterior, +z superior) that means the image's
+  rows run towards +x and its columns towards +y; an axis whose direction cosine points the other
+  way is flipped. The series in Orthanc is unchanged (the converted MSD series keep
+  ImageOrientationPatient -1\\0\\0\\0\\-1\\0, which is valid DICOM). The edge letters (A, P, R, L,
+  S, I) come from the directions after the flip. Volumes and the mask itself do not change.
 """
 
 from __future__ import annotations
@@ -51,12 +58,60 @@ def slice_order(instances: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return [instance for _, instance in sorted(keyed, key=lambda pair: pair[0])]
 
 
+LPS_LETTERS = {(0, 1): "L", (0, -1): "R", (1, 1): "P", (1, -1): "A", (2, 1): "S", (2, -1): "I"}
+
+
+def _letter(direction: NDArray[np.float64]) -> str:
+    """The patient direction (LPS) a unit vector mostly points to."""
+    axis = int(np.argmax(np.abs(direction)))
+    return LPS_LETTERS[(axis, 1 if direction[axis] > 0 else -1)]
+
+
+@dataclass(frozen=True)
+class Display:
+    """How a slice is shown: which image axes are flipped, and the letters on its edges."""
+
+    flip_rows: bool  # top to bottom
+    flip_columns: bool  # left to right
+    top: str
+    bottom: str
+    left: str
+    right: str
+
+    def markers(self) -> dict[str, str]:
+        return {"top": self.top, "bottom": self.bottom, "left": self.left, "right": self.right}
+
+
+def display(orientation: Any) -> Display:
+    """Flip an image axis whose direction cosine (on its main patient axis) is negative, so that
+    axial slices show anterior up and the patient's right on the image's left."""
+    cosines = _floats(orientation)
+    along_row, along_column = cosines[:3], cosines[3:]  # across the columns, down the rows
+    flip_columns = bool(along_row[int(np.argmax(np.abs(along_row)))] < 0)
+    flip_rows = bool(along_column[int(np.argmax(np.abs(along_column)))] < 0)
+    right = -along_row if flip_columns else along_row  # screen right after the flip
+    down = -along_column if flip_rows else along_column  # screen down after the flip
+    return Display(
+        flip_rows, flip_columns, _letter(-down), _letter(down), _letter(-right), _letter(right)
+    )
+
+
+def orient(pixels: NDArray[Any], how: Display) -> NDArray[Any]:
+    """The one display transform, for a slice and its mask alike ((rows, columns, ...))."""
+    if how.flip_rows:
+        pixels = pixels[::-1]
+    if how.flip_columns:
+        pixels = pixels[:, ::-1]
+    return np.ascontiguousarray(pixels)
+
+
 @dataclass(frozen=True)
 class Geometry:
     instance_ids: tuple[str, ...]  # in slice order (k)
     shape: tuple[int, int, int]  # columns, rows, slices
     affine: NDArray[np.float64]  # RAS, voxel (i, j, k) -> mm
     voxel_ml: float
+    display: Display
 
     def key(self) -> str:
         data = np.round(self.affine, 4).tobytes() + repr(self.shape).encode()
@@ -87,7 +142,13 @@ def geometry(instances: Sequence[dict[str, Any]], first: Dataset) -> Geometry:
     lps[:3, 3] = positions[0]
     voxel_ml = float(spacing[0] * spacing[1] * np.linalg.norm(slice_step)) / 1000
     shape = (int(first.Columns), int(first.Rows), len(ordered))
-    return Geometry(tuple(str(i["ID"]) for i in ordered), shape, RAS_TO_LPS @ lps, voxel_ml)
+    return Geometry(
+        tuple(str(i["ID"]) for i in ordered),
+        shape,
+        RAS_TO_LPS @ lps,
+        voxel_ml,
+        display(first.ImageOrientationPatient),
+    )
 
 
 def resample_nearest(
@@ -113,25 +174,26 @@ def resample_nearest(
     return out
 
 
-def windowed_png(ds: Dataset) -> bytes:
-    """One CT slice as an 8-bit PNG with window 40/400 (rows down, columns across)."""
+def windowed_png(ds: Dataset, how: Display) -> bytes:
+    """One CT slice as an 8-bit PNG with window 40/400, oriented for display."""
     hu = ds.pixel_array.astype(np.float64) * float(ds.get("RescaleSlope", 1)) + float(
         ds.get("RescaleIntercept", 0)
     )
     low = WINDOW_CENTER - WINDOW_WIDTH / 2
-    pixels = np.clip((hu - low) / WINDOW_WIDTH, 0, 1) * 255
+    pixels = np.round(np.clip((hu - low) / WINDOW_WIDTH, 0, 1) * 255).astype(np.uint8)
     buffer = io.BytesIO()
-    Image.fromarray(np.round(pixels).astype(np.uint8), mode="L").save(buffer, format="PNG")
+    Image.fromarray(orient(pixels, how), mode="L").save(buffer, format="PNG")
     return buffer.getvalue()
 
 
-def mask_png(mask_slice: NDArray[np.uint8]) -> bytes:
-    """One mask slice (i, j) as an RGBA PNG (rows down): colour where 1, transparent where 0."""
-    rows = mask_slice.T > 0
+def mask_png(mask_slice: NDArray[np.uint8], how: Display) -> bytes:
+    """One mask slice (i, j) as an RGBA PNG, oriented as its slice: colour where 1, transparent
+    where 0."""
+    rows = mask_slice.T > 0  # (rows j, columns i), as the slice's pixel array
     rgba = np.zeros((*rows.shape, 4), dtype=np.uint8)
     rgba[rows] = (*MASK_RGB, 255)
     buffer = io.BytesIO()
-    Image.fromarray(rgba, mode="RGBA").save(buffer, format="PNG")
+    Image.fromarray(orient(rgba, how), mode="RGBA").save(buffer, format="PNG")
     return buffer.getvalue()
 
 

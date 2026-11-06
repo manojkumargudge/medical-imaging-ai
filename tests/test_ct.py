@@ -17,6 +17,8 @@ from src.api import ct, studies
 from src.dicom import convert
 from src.service.stack import DEMO_NIH_IMAGES, DEMO_SPLEEN_CASE, demo_study_uids
 
+STANDARD = ct.display([1, 0, 0, 0, 1, 0])  # rows towards patient left, columns posterior
+
 
 def series(
     tmp_path: Path, affine: np.ndarray, shape: tuple[int, int, int] = (20, 16, 7)
@@ -122,11 +124,11 @@ def test_window_and_mask_pngs() -> None:
     ds.SamplesPerPixel, ds.PhotometricInterpretation = 1, "MONOCHROME2"
     ds.PixelData = pixels.tobytes()
     ds.file_meta = convert._file_meta("1.2.840.10008.5.1.4.1.1.2", "1.2.3")
-    with Image.open(io.BytesIO(ct.windowed_png(ds))) as image:
+    with Image.open(io.BytesIO(ct.windowed_png(ds, STANDARD))) as image:
         assert np.asarray(image).tolist() == [[0, 128], [255, 0]]
     mask = np.zeros((3, 2), dtype=np.uint8)  # (i, j)
     mask[2, 0] = 1
-    with Image.open(io.BytesIO(ct.mask_png(mask))) as image:
+    with Image.open(io.BytesIO(ct.mask_png(mask, STANDARD))) as image:
         rgba = np.asarray(image)
     assert rgba.shape == (2, 3, 4)  # rows (j) down, columns (i) across
     assert rgba[0, 2].tolist() == [*ct.MASK_RGB, 255] and rgba[..., 3].sum() == 255
@@ -173,3 +175,57 @@ def _png() -> bytes:
     buffer = io.BytesIO()
     Image.fromarray(np.zeros((8, 8), dtype=np.uint8)).save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+# Axial ImageOrientationPatient values (LPS) and what a standard display must flip for them.
+ORIENTATIONS = {
+    "standard": ([1, 0, 0, 0, 1, 0], False, False),
+    "both flipped (the converted MSD series)": ([-1, 0, 0, 0, -1, 0], True, True),
+    "rows flipped": ([-1, 0, 0, 0, 1, 0], False, True),
+    "columns flipped": ([1, 0, 0, 0, -1, 0], True, False),
+}
+
+
+@pytest.mark.parametrize("name", list(ORIENTATIONS))
+def test_every_axial_orientation_shows_anterior_up_right_on_left(name: str) -> None:
+    iop, flip_rows, flip_columns = ORIENTATIONS[name]
+    how = ct.display(iop)
+    assert (how.flip_rows, how.flip_columns) == (flip_rows, flip_columns)
+    assert type(how.flip_rows) is bool and type(how.flip_columns) is bool  # JSON-serialisable
+    assert how.markers() == {"top": "A", "bottom": "P", "left": "R", "right": "L"}
+
+
+def _bright(png: bytes) -> tuple[int, int]:
+    with Image.open(io.BytesIO(png)) as image:
+        pixels = np.asarray(image)
+    values = pixels[..., 3] if pixels.ndim == 3 else pixels
+    [(row, column)] = np.argwhere(values > 0)
+    return int(row), int(column)
+
+
+@pytest.mark.parametrize("name", list(ORIENTATIONS))
+def test_slice_and_mask_get_the_same_transform(name: str) -> None:
+    """A pixel at the patient's anterior-right corner shows at the top left, in the slice and in
+    its mask alike."""
+    iop = ORIENTATIONS[name][0]
+    how = ct.display(iop)
+    cosines = np.array(iop, dtype=np.float64)
+    rows, columns = 5, 7
+    # Patient x of column c is c * row cosine x; patient y of row r is r * column cosine y.
+    column = 0 if cosines[0] > 0 else columns - 1  # smallest x: the patient's right
+    row = 0 if cosines[4] > 0 else rows - 1  # smallest y: anterior
+    hu = np.full((rows, columns), -1000, dtype=np.int16)
+    hu[row, column] = 240
+    ds = Dataset()
+    ds.RescaleSlope, ds.RescaleIntercept = 1, 0
+    ds.Rows, ds.Columns = rows, columns
+    ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 16, 16, 15, 1
+    ds.SamplesPerPixel, ds.PhotometricInterpretation = 1, "MONOCHROME2"
+    ds.PixelData = hu.tobytes()
+    ds.file_meta = convert._file_meta("1.2.840.10008.5.1.4.1.1.2", "1.2.3")
+    mask = np.zeros((columns, rows), dtype=np.uint8)  # (i, j)
+    mask[column, row] = 1
+    shown_slice = _bright(ct.windowed_png(ds, how))
+    shown_mask = _bright(ct.mask_png(mask, how))
+    print(f"{name}: pixel ({row}, {column}) shown at {shown_slice} (slice), {shown_mask} (mask)")
+    assert shown_slice == shown_mask == (0, 0)

@@ -544,6 +544,14 @@ folder; the worker outputs stay read-only). Slice PNGs are cached in memory. Che
 441.9 mL against 440.8 mL stored (+0.26%), and its Dice against the ground-truth label on the
 same grid is 0.9673 (0.9579 reported on the 1.5 mm grid), so the orientation is right.
 
+Display: the API flips a slice and its mask PNG with the same function when an image axis's
+direction cosine is negative, so every axial series shows anterior up and the patient's right
+on the image's left; the CT view puts A, P, R and L on the image edges from the orientation after
+the flip. The converted MSD series keep ImageOrientationPatient `-1\0\0\0\-1\0` (valid DICOM),
+which a viewer that draws the stored pixels as they are (Orthanc's own) shows rotated by 180
+degrees.
+Volumes and the mask itself do not change.
+
 Safety checks:
 
 - `{id}` must be a study ID that Orthanc lists, and `{label}` one of the 14 labels, before any

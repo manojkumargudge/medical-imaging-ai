@@ -108,6 +108,8 @@ export interface CtMeta {
   spleen_ml: number | null;
   spleen_ml_dicom_grid: number | null;
   result_id: number | null;
+  // Patient directions at the image edges, after the API's display flips (A, P, R, L, S, I).
+  orientation: { top: string; bottom: string; left: string; right: string };
 }
 
 export const CLASSIFIER = "densenet121-chestxray14";

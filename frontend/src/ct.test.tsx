@@ -13,6 +13,7 @@ const META: CtMeta = {
   spleen_ml: 440.764875,
   spleen_ml_dicom_grid: 441.9,
   result_id: 22,
+  orientation: { top: "A", bottom: "P", left: "R", right: "L" },
 };
 
 function detail(source: "demo" | "upload" | "unknown" = "demo"): StudyDetail {
@@ -133,4 +134,15 @@ test("a CT that is not a demo study shows the model-scope warning", async () => 
   cleanup();
   await open("demo");
   expect(screen.queryByLabelText("Model scope warning")).toBeNull();
+});
+
+test("the image edges carry the patient directions from the API", async () => {
+  await open();
+  const marker = (edge: string) => screen.getByTestId(`marker-${edge}`).textContent;
+  expect([marker("top"), marker("bottom"), marker("left"), marker("right")]).toEqual([
+    "A",
+    "P",
+    "R",
+    "L",
+  ]);
 });
