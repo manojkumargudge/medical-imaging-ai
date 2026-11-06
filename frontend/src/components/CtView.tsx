@@ -1,6 +1,7 @@
 import { SEGMENTATION, type SegmentationResults, type StudyDetail } from "../api";
 import { statusBadge } from "../status";
 import { BadgeView } from "./Layout";
+import { ReviewPanel } from "./ReviewPanel";
 
 export function CtView({ detail }: { detail: StudyDetail }) {
   const result = detail.results.find((r) => r.model === SEGMENTATION && r.status === "ok");
@@ -23,6 +24,10 @@ export function CtView({ detail }: { detail: StudyDetail }) {
         </section>
       ))}
       <p>The slice view with the spleen mask comes later.</p>
+      <ReviewPanel
+        studyId={detail.study.id}
+        resultId={detail.results.find((r) => r.model === SEGMENTATION)?.id ?? null}
+      />
     </>
   );
 }

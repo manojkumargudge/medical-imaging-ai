@@ -165,6 +165,8 @@ def png_to_dx(
     # Ages above 100 in NIH are recording errors; they are left out rather than copied.
     ds.PatientAge = f"{age:03d}Y" if age is not None and 0 <= age <= 100 else ""
     ds.DerivationDescription = "Converted from NIH ChestX-ray14 PNG (8-bit, resized by NIH)"
+    # The source image name, for the viewer's worklist (it holds only the NIH patient ID).
+    ds.StudyDescription = f"NIH ChestX-ray14 {source}" if source else ""
     ds.BurnedInAnnotation = "NO"
     if pixel_spacing is not None:
         ds.ImagerPixelSpacing = [round(value, 6) for value in pixel_spacing]
@@ -243,6 +245,7 @@ def nifti_to_ct_series(
         ds.SeriesNumber = 1
         ds.InstanceNumber = k + 1
         ds.SeriesDescription = series_description
+        ds.StudyDescription = series_description
         ds.ImageType = ["DERIVED", "SECONDARY", "AXIAL"]
         ds.FrameOfReferenceUID = frame_uid
         ds.PositionReferenceIndicator = ""

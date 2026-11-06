@@ -1,4 +1,5 @@
-"""The viewer API: worklist, study details, DX image, raw Grad-CAM maps, thresholds. Read-only.
+"""The viewer API: worklist, study details, DX image, raw Grad-CAM maps, thresholds, reviews and
+the audit log. The only write is a review (with its audit row, in one transaction).
 
 - Orthanc is reached only from here, with the credentials in this process's environment
   (ORTHANC_URL, ORTHANC_USER, ORTHANC_PASSWORD); the browser never calls Orthanc.
@@ -6,6 +7,8 @@
   configs/viewer_thresholds.yaml, before any file path is built; a file must also resolve
   inside RESULTS_DIR. Anything else is 404.
 - Orthanc or the results database down: 503 with a message saying which and why.
+- Reviews: 409 if the submit token was used already or a newer result exists; 422 for missing
+  or invalid fields (reject needs a comment). Reviewer names are typed in and not verified.
 
 Environment: ORTHANC_URL, ORTHANC_USER, ORTHANC_PASSWORD, RESULTS_DB_URL, RESULTS_DIR (the
 worker's output folder, read-only), VIEWER_THRESHOLDS. For education only, not for clinical use.
@@ -22,15 +25,25 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
+from uuid import UUID
 
 import yaml
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 from pydicom import dcmread
 
 from src.api import studies
-from src.api.db import Database, DatabaseUnavailableError, PostgresDatabase
+from src.api.db import (
+    Database,
+    DatabaseUnavailableError,
+    NewReview,
+    PostgresDatabase,
+    ReviewConflictError,
+    ReviewInvalidError,
+)
 from src.dicom.render import to_png
 from src.service.orthanc import Orthanc, OrthancError
 from src.service.stack import DEMO, TEST
@@ -83,6 +96,28 @@ class Services:
         return study
 
 
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+Comment = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+
+
+class ReviewIn(BaseModel):
+    """A review as the browser sends it. Names are not verified (there is no login)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["approve", "reject"]
+    reviewer: Name
+    comment: Comment | None = None
+    submit_token: UUID
+    inference_result_id: int
+
+    @model_validator(mode="after")
+    def reject_needs_comment(self) -> ReviewIn:
+        if self.decision == "reject" and not self.comment:
+            raise ValueError("a comment is required to reject")
+        return self
+
+
 def load_thresholds(path: Path) -> dict[str, Any]:
     data: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))
     if len(data["labels"]) != 14:
@@ -110,12 +145,17 @@ def iso(value: datetime | None) -> str | None:
 
 def summary(
     study: dict[str, Any],
-    modalities: set[str],
+    series: list[dict[str, Any]],
     results: list[dict[str, Any]],
     review: dict[str, Any] | None,
-    uploaded: set[str],
+    uploaded: dict[str, str],
+    thresholds: dict[str, Any],
 ) -> dict[str, Any]:
     study_uid = str(study["MainDicomTags"].get("StudyInstanceUID", ""))
+    modalities = {
+        str(x["MainDicomTags"]["Modality"]) for x in series if x["MainDicomTags"].get("Modality")
+    }
+    filename = uploaded.get(study["ID"]) or uploaded.get(study_uid)
     times = [studies.orthanc_time(study["LastUpdate"])]
     times += [row["created_at"] for row in results]
     if review:
@@ -124,14 +164,33 @@ def summary(
         "id": study["ID"],
         "study_uid": study_uid,
         "patient_id": study.get("PatientMainDicomTags", {}).get("PatientID", ""),
+        "description": studies.description(study, series, filename),
         "modality": ",".join(sorted(modalities)),
         "status": studies.processing_status(
             bool(study["IsStable"]), modalities, {row["model"]: row["status"] for row in results}
         ),
         "review_status": studies.review_status(review["decision"] if review else None),
-        "source": "upload" if {study["ID"], study_uid} & uploaded else "demo",
+        "source": "upload" if filename is not None else "demo",
+        "summary": studies.result_summary(results, thresholds["labels"]),
         "updated_at": iso(max(times)),
     }
+
+
+def validation_errors(error: RequestValidationError) -> list[dict[str, Any]]:
+    return [
+        {"loc": [str(p) for p in item.get("loc", ())], "msg": str(item.get("msg", ""))}
+        for item in error.errors()
+    ]
+
+
+def readable(error: RequestValidationError) -> str:
+    """FastAPI's validation errors as one sentence for the viewer."""
+    parts = []
+    for item in validation_errors(error):
+        where = ".".join(p for p in item["loc"] if p != "body")
+        message = item["msg"].removeprefix("Value error, ")
+        parts.append(f"{where}: {message}" if where else message)
+    return "; ".join(parts) or "invalid request"
 
 
 def public_result(row: dict[str, Any]) -> dict[str, Any]:
@@ -155,6 +214,11 @@ def create_app(services: Services | None = None) -> FastAPI:
     @app.exception_handler(OrthancUnavailableError)
     async def orthanc_down(_: Request, error: OrthancUnavailableError) -> JSONResponse:
         return JSONResponse({"detail": str(error)}, status_code=503)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid(_: Request, error: RequestValidationError) -> JSONResponse:
+        body = {"detail": readable(error), "errors": validation_errors(error)}
+        return JSONResponse(body, status_code=422)
 
     @app.exception_handler(DatabaseUnavailableError)
     async def db_down(_: Request, error: DatabaseUnavailableError) -> JSONResponse:
@@ -184,11 +248,9 @@ def create_app(services: Services | None = None) -> FastAPI:
     def list_studies() -> dict[str, Any]:
         s = svc()
         orthanc_studies = s.get_json("/studies?expand")
-        modalities: dict[str, set[str]] = defaultdict(set)
+        series_by_study: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for series in s.get_json("/series?expand"):
-            modality = series["MainDicomTags"].get("Modality")
-            if modality:
-                modalities[series["ParentStudy"]].add(str(modality))
+            series_by_study[series["ParentStudy"]].append(series)
         results: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in s.db.newest_results():
             results[row["study_uid"]].append(row)
@@ -197,7 +259,14 @@ def create_app(services: Services | None = None) -> FastAPI:
         for study in orthanc_studies:
             uid = str(study["MainDicomTags"].get("StudyInstanceUID", ""))
             items.append(
-                summary(study, modalities[study["ID"]], results[uid], reviews.get(uid), uploaded)
+                summary(
+                    study,
+                    series_by_study[study["ID"]],
+                    results[uid],
+                    reviews.get(uid),
+                    uploaded,
+                    s.thresholds,
+                )
             )
         items.sort(key=lambda item: item["updated_at"] or "", reverse=True)
         return {"studies": items, "notice": studies.NOTICE}
@@ -207,14 +276,11 @@ def create_app(services: Services | None = None) -> FastAPI:
         s = svc()
         study = s.known_study(study_id)
         series = s.get_json(f"/studies/{study_id}/series")
-        modalities = {
-            str(x["MainDicomTags"]["Modality"]) for x in series if "Modality" in x["MainDicomTags"]
-        }
         uid = str(study["MainDicomTags"].get("StudyInstanceUID", ""))
         results = s.db.newest_results(uid)
         review = s.db.newest_reviews(uid).get(uid)
         return {
-            "study": summary(study, modalities, results, review, s.db.uploaded()),
+            "study": summary(study, series, results, review, s.db.uploaded(), s.thresholds),
             "series": [
                 {
                     "id": x["ID"],
@@ -271,6 +337,48 @@ def create_app(services: Services | None = None) -> FastAPI:
         if not path.is_relative_to(root) or not path.is_file():
             raise HTTPException(404, "raw map file not found")
         return Response(path.read_bytes(), media_type="image/png")
+
+    @app.get("/api/studies/{study_id}/reviews")
+    def list_reviews(study_id: str) -> dict[str, Any]:
+        s = svc()
+        uid = str(s.known_study(study_id)["MainDicomTags"].get("StudyInstanceUID", ""))
+        rows = s.db.reviews(uid)
+        return {"reviews": [public_review(row) for row in rows], "notice": studies.NOTICE}
+
+    @app.post("/api/studies/{study_id}/reviews", status_code=201)
+    def add_review(study_id: str, review: ReviewIn) -> dict[str, Any]:
+        s = svc()
+        uid = str(s.known_study(study_id)["MainDicomTags"].get("StudyInstanceUID", ""))
+        try:
+            row = s.db.add_review(
+                NewReview(
+                    study_uid=uid,
+                    inference_result_id=review.inference_result_id,
+                    decision=review.decision,
+                    reviewer=review.reviewer,
+                    comment=review.comment or None,
+                    submit_token=review.submit_token,
+                )
+            )
+        except ReviewConflictError as error:
+            raise HTTPException(409, str(error)) from None
+        except ReviewInvalidError as error:
+            raise HTTPException(422, str(error)) from None
+        return {"review": public_review(row)}
+
+    @app.get("/api/audit")
+    def audit(
+        page: Annotated[int, Query(ge=1)] = 1,
+        page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> dict[str, Any]:
+        rows, total = svc().db.audit(page_size, (page - 1) * page_size)
+        return {
+            "entries": [{**row, "created_at": iso(row["created_at"])} for row in rows],
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "notice": studies.NOTICE,
+        }
 
     @app.get("/api/config/thresholds")
     def thresholds() -> dict[str, Any]:

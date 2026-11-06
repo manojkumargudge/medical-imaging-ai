@@ -167,3 +167,74 @@ h2 {
     font-size: 0.9rem;
   }
 }
+
+.header {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.header nav a {
+  font-weight: 500;
+  margin-right: 14px;
+}
+
+.table tr.clickable {
+  cursor: pointer;
+}
+
+.table tr.clickable:hover td {
+  background: #f3f6fb;
+}
+
+.review-fields {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.review-fields fieldset {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  display: flex;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field input,
+.field textarea {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid #b9c1ce;
+  border-radius: 4px;
+}
+
+.review button {
+  justify-self: start;
+  font: inherit;
+  padding: 6px 14px;
+}
+
+.saved {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.uid {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.pager button {
+  font: inherit;
+}

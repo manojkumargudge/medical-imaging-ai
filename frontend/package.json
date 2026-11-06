@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "description": "AIML-02 viewer. For education only, not for clinical use.",
   "type": "module",
+  "engines": {
+    "node": ">=22.22.2 <23"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

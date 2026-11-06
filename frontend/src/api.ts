@@ -7,7 +7,9 @@ export interface StudySummary {
   id: string;
   study_uid: string;
   patient_id: string;
+  description: string;
   modality: string;
+  summary: string | null;
   status: ProcessingStatus;
   review_status: ReviewStatus;
   source: "demo" | "upload";
@@ -59,6 +61,42 @@ export interface Health {
   orthanc: { ok: boolean; name?: string; stack?: string; error?: string };
 }
 
+export type Decision = "approve" | "reject";
+
+export interface Review {
+  id: number;
+  study_uid: string;
+  inference_result_id: number;
+  decision: Decision;
+  reviewer: string;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface NewReview {
+  decision: Decision;
+  reviewer: string;
+  comment: string | null;
+  submit_token: string;
+  inference_result_id: number;
+}
+
+export interface AuditEntry {
+  id: number;
+  created_at: string;
+  actor: string;
+  event: "upload" | "inference_done" | "inference_failed" | "review";
+  study_uid: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface AuditPage {
+  entries: AuditEntry[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
 export const CLASSIFIER = "densenet121-chestxray14";
 export const SEGMENTATION = "monai-unet-spleen";
 
@@ -72,7 +110,25 @@ export class ApiError extends Error {
 }
 
 export async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, { headers: { Accept: "application/json" } });
+  return parse<T>(await fetch(path, { headers: { Accept: "application/json" } }));
+}
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  return parse<T>(
+    await fetch(path, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** A new submit token: one per opened review panel (the server saves a token once). */
+export function newToken(): string {
+  return crypto.randomUUID();
+}
+
+async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = response.statusText;
     try {

@@ -5,6 +5,8 @@ const study = (status: ProcessingStatus): StudySummary => ({
   id: status,
   study_uid: "1",
   patient_id: "p",
+  description: "",
+  summary: null,
   modality: "DX",
   status,
   review_status: "none",
