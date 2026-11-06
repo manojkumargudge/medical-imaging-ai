@@ -108,7 +108,9 @@ class Worker:
             outcomes.append(status if added else "skipped")
         return outcomes
 
-    def run(self, interval: float) -> None:
+    def run(self, interval: float, heartbeat: Path | None = None) -> None:
+        """Poll forever. After each poll, successful or not, touch `heartbeat` (if given): the
+        Compose healthcheck reads its age, since the worker serves no HTTP."""
         while True:
             try:
                 if self.poll_once() == 0:
@@ -116,6 +118,9 @@ class Worker:
             except Exception as error:  # Orthanc or the database is down: retry later
                 self.log(f"poll failed: {type(error).__name__}: {error}")
                 time.sleep(interval)
+            finally:
+                if heartbeat is not None:
+                    heartbeat.touch()
 
 
 def analyzers_from_env() -> list[Analyzer]:
@@ -149,7 +154,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         while worker.poll_once():
             pass
     else:
-        worker.run(args.interval)
+        heartbeat = os.environ.get("WORKER_HEARTBEAT")
+        worker.run(args.interval, Path(heartbeat) if heartbeat else None)
 
 
 if __name__ == "__main__":

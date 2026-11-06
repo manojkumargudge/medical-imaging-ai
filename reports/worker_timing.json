@@ -1,0 +1,53 @@
+{
+  "notice": "For education only. Not for clinical use.",
+  "what": "worker models on the demo studies, timed inside the worker container: download from Orthanc, inference, writing outputs",
+  "command": "docker compose exec worker python -m src.service.timing --runs 6 --warm-up 1",
+  "date": "2026-11-06",
+  "machine": "Intel Core i5-1235U laptop (2 performance + 8 efficiency cores), Docker Desktop WSL2 VM with 12 CPUs and 10 GB, on AC power, Windows Balanced power plan",
+  "threads": 4,
+  "cpus": 12,
+  "studies": {
+    "13 (086721926711) densenet121-chestxray14": {
+      "runs": [
+        10.47,
+        7.03,
+        10.26,
+        8.02,
+        7.63,
+        7.12
+      ],
+      "warm_runs": 5,
+      "median": 7.6,
+      "min": 7.0,
+      "max": 10.3
+    },
+    "116 (641764895987) densenet121-chestxray14": {
+      "runs": [
+        6.02,
+        6.88,
+        21.84,
+        5.51,
+        6.45,
+        7.12
+      ],
+      "warm_runs": 5,
+      "median": 6.9,
+      "min": 5.5,
+      "max": 21.8
+    },
+    "spleen_14 (208692380549) monai-unet-spleen": {
+      "runs": [
+        66.57,
+        13.68,
+        12.17,
+        18.67,
+        13.46,
+        14.96
+      ],
+      "warm_runs": 5,
+      "median": 13.7,
+      "min": 12.2,
+      "max": 18.7
+    }
+  }
+}

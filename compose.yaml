@@ -1,0 +1,19 @@
+# The whole demo stack in one command, from the repository root:
+#   docker compose up -d --build --wait
+# Orthanc, the results Postgres, the inference worker, the viewer API and the frontend
+# (http://127.0.0.1:8080). The four files below are merged in order, as with -f ... -f ...; each
+# service has a healthcheck, and each waits for the ones it needs (depends_on: service_healthy).
+# Every port is bound to 127.0.0.1 and every image is pinned to a version. Needs .env (see
+# .env.example) with the passwords and the two checkpoint paths. Before the first start, apply
+# the database migrations once: python -m src.service.migrate
+# `docker compose down` keeps the volumes (Orthanc studies, results database); never add -v
+# unless you mean to delete them. For education only, not for clinical use.
+
+name: aiml02
+
+include:
+  - path:
+      - docker-compose.yml
+      - docker-compose.worker.yml
+      - docker-compose.api.yml
+      - docker-compose.frontend.yml

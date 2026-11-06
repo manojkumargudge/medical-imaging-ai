@@ -1,4 +1,4 @@
-# The inference worker, added to docker-compose.yml:
+# The inference worker, added to docker-compose.yml (compose.yaml starts the whole demo stack):
 #   docker compose -f docker-compose.yml -f docker-compose.worker.yml up -d --build
 # CLASSIFIER_CHECKPOINT and SEGMENTATION_CHECKPOINT in .env are paths on this machine, outside
 # the repository; each file is mounted read-only. Checkpoints are never in the image or in git.
@@ -22,6 +22,19 @@ services:
       SEGMENTATION_CHECKPOINT: /checkpoints/segmentation.pt
       RESULTS_DIR: /results
       WORKER_THREADS: "4"
+      WORKER_HEARTBEAT: /tmp/worker-heartbeat
+    # The worker serves no HTTP: healthy while it has polled in the last 5 minutes (it touches
+    # the heartbeat file after every poll; a CT study takes up to about 95 s on this laptop).
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/worker-heartbeat') > 300)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     volumes:
       - ${CLASSIFIER_CHECKPOINT:?set CLASSIFIER_CHECKPOINT in .env}:/checkpoints/classifier.pt:ro
       - ${SEGMENTATION_CHECKPOINT:?set SEGMENTATION_CHECKPOINT in .env}:/checkpoints/segmentation.pt:ro
