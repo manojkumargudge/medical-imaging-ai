@@ -1,0 +1,30 @@
+# The viewer API, added to docker-compose.yml. Demo:
+#   docker compose -f docker-compose.yml -f docker-compose.api.yml up -d --build --wait
+# Test stack (its own port, database and results folder from .env.test):
+#   docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+#       -f docker-compose.api.yml up -d --build --wait
+# The Orthanc credentials are only in this container's environment: the browser talks to the
+# API, never to Orthanc. Port bound to 127.0.0.1 only. For education only, not for clinical use.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: aiml02-api:local
+    restart: unless-stopped
+    depends_on:
+      orthanc:
+        condition: service_healthy
+      results-db:
+        condition: service_healthy
+    environment:
+      ORTHANC_URL: http://orthanc:8042
+      ORTHANC_USER: ${ORTHANC_USER}
+      ORTHANC_PASSWORD: ${ORTHANC_PASSWORD}
+      RESULTS_DB_URL: postgresql://aiml02:${RESULTS_DB_PASSWORD}@results-db:5432/${RESULTS_DB_NAME:-aiml02_results}
+      RESULTS_DIR: /results
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ${WORKER_RESULTS_DIR:-./results/worker}:/results:ro

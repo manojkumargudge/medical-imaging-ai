@@ -20,7 +20,7 @@ jobs:
         # PyPI would add gigabytes of downloads that the CPU tests do not need.
         env:
           PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,api]"
       - name: Lint
         run: |
           ruff check .
@@ -45,15 +45,20 @@ jobs:
       - name: Install
         env:
           PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,api]"
       - name: Start the test stack
+        # With the API container, built from Dockerfile.api.
         run: |
           python -m scripts.make_test_env
-          docker compose -p aiml02-test --env-file .env.test up -d --wait
+          docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+            -f docker-compose.api.yml up -d --build --wait
+          python -m src.service.migrate --env-file .env.test
       - name: Integration tests
         env:
           AIML02_INTEGRATION: "1"
         run: python -m pytest -m integration -s
       - name: Service logs
         if: failure()
-        run: docker compose -p aiml02-test --env-file .env.test logs
+        run: |
+          docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+            -f docker-compose.api.yml logs

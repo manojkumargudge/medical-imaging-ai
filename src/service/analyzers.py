@@ -23,14 +23,13 @@ import torch
 import yaml
 from monai.inferers import sliding_window_inference
 from numpy.typing import NDArray
-from PIL import Image
 from pydicom import dcmread
 from pydicom.dataset import Dataset
-from pydicom.pixels.processing import apply_voi_lut
 from torch import nn
 
 from src.data.preprocess import read_params, sha256_file
 from src.dicom.convert import read_ct_series
+from src.dicom.render import to_png
 from src.explain import gradcam
 from src.models.checkpoints import load_checkpoint
 from src.models.classifier import build_model
@@ -52,31 +51,6 @@ class Analyzer(Protocol):
     def analyze(
         self, orthanc: Reader, series: Sequence[Mapping[str, Any]], out_dir: Path, root: Path
     ) -> dict[str, Any]: ...
-
-
-def to_png(ds: Dataset) -> bytes:
-    """A grayscale DX/CR image as an 8-bit PNG, the format the classifier was trained on.
-
-    8-bit MONOCHROME2 pixels (NIH images converted by src/dicom) are passed through unchanged.
-    Other images get their VOI LUT or window, are scaled to 0-255 and inverted if MONOCHROME1;
-    such images differ from the NIH training data.
-    """
-    pixels = ds.pixel_array
-    if pixels.ndim != 2:
-        raise ValueError(f"expected one grayscale frame, got shape {pixels.shape}")
-    photometric = str(ds.PhotometricInterpretation)
-    if photometric not in ("MONOCHROME1", "MONOCHROME2"):
-        raise ValueError(f"expected a grayscale image, got {photometric}")
-    if pixels.dtype != np.uint8 or photometric == "MONOCHROME1":
-        values = np.asarray(apply_voi_lut(pixels, ds), dtype=np.float64)
-        low, high = float(values.min()), float(values.max())
-        scaled = (values - low) / (high - low) if high > low else np.zeros_like(values)
-        if photometric == "MONOCHROME1":
-            scaled = 1 - scaled
-        pixels = np.round(scaled * 255).astype(np.uint8)
-    buffer = io.BytesIO()
-    Image.fromarray(pixels, mode="L").save(buffer, format="PNG")
-    return buffer.getvalue()
 
 
 @dataclass
