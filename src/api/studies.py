@@ -80,11 +80,10 @@ def result_summary(rows: Iterable[Mapping[str, Any]], thresholds: Mapping[str, A
     return "; ".join(parts) or None
 
 
-def description(
-    study: Mapping[str, Any], series: Iterable[Mapping[str, Any]], filename: str | None
-) -> str:
-    """StudyDescription, else the first SeriesDescription, else the uploaded file's name."""
+def description(study: Mapping[str, Any], series: Iterable[Mapping[str, Any]]) -> str:
+    """StudyDescription, else the first SeriesDescription. An upload's is "Upload <id>"; the
+    uploaded file's name is never shown."""
     found = str(study.get("MainDicomTags", {}).get("StudyDescription") or "")
     for one in series:
         found = found or str(one.get("MainDicomTags", {}).get("SeriesDescription") or "")
-    return found or filename or ""
+    return found

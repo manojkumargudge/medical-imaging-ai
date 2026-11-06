@@ -4,11 +4,12 @@ import { AuditPage } from "./components/AuditPage";
 import { CtView } from "./components/CtView";
 import { DxView } from "./components/DxView";
 import { ErrorBox, Layout } from "./components/Layout";
+import { UploadPage } from "./components/UploadPage";
 import { Worklist } from "./components/Worklist";
 import { viewerKind } from "./status";
 
 export interface Route {
-  page: "worklist" | "study" | "audit";
+  page: "worklist" | "study" | "audit" | "upload";
   id?: string;
   label?: string;
 }
@@ -17,6 +18,7 @@ export interface Route {
 export function parseRoute(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?");
   if (path === "/audit") return { page: "audit" };
+  if (path === "/upload") return { page: "upload" };
   const match = /^\/studies\/([^/]+)$/.exec(path);
   if (!match?.[1]) return { page: "worklist" };
   const label = new URLSearchParams(query).get("label") ?? undefined;
@@ -58,6 +60,8 @@ export function App() {
     <Layout>
       {route.page === "audit" ? (
         <AuditPage />
+      ) : route.page === "upload" ? (
+        <UploadPage />
       ) : route.page === "study" && route.id ? (
         <>
           <p>

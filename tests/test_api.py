@@ -13,6 +13,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 from PIL import Image
+from pydicom import dcmread
 from pydicom.dataset import Dataset
 from test_worker import dx
 
@@ -23,6 +24,7 @@ from src.api.db import (
     NEWER_RESULT,
     DatabaseUnavailableError,
     NewReview,
+    NewUpload,
     ReviewConflictError,
     ReviewInvalidError,
 )
@@ -108,6 +110,18 @@ class FakeOrthanc(Orthanc):
         files: dict[str, bytes] = self.state["files"]  # type: ignore[attr-defined]
         return files[path.split("/")[2]]
 
+    def upload(self, dicom: bytes) -> dict[str, Any]:
+        """Store one instance as a new study (the API gives every upload new UIDs)."""
+        self._check()
+        ds = dcmread(io.BytesIO(dicom))
+        study_id = f"up-{len(self.state['studies'])}"  # type: ignore[attr-defined]
+        self.add(study_id, str(ds.StudyInstanceUID), {str(ds.Modality): [ds]})
+        self.state["studies"][study_id]["MainDicomTags"]["StudyDescription"] = str(  # type: ignore[attr-defined]
+            ds.get("StudyDescription", "")
+        )
+        self.state["uploaded"] = dicom  # type: ignore[attr-defined]
+        return {"ID": f"{study_id}-0-0", "ParentStudy": study_id, "Status": "Success"}
+
 
 @dataclass
 class FakeDb:
@@ -117,7 +131,9 @@ class FakeDb:
     results: list[dict[str, Any]] = field(default_factory=list)
     review_rows: list[dict[str, Any]] = field(default_factory=list)
     audit_rows: list[dict[str, Any]] = field(default_factory=list)
-    uploads: dict[str, str] = field(default_factory=dict)
+    uploads: set[str] = field(default_factory=set)  # Orthanc study IDs or UIDs of uploads
+    upload_rows: list[dict[str, Any]] = field(default_factory=list)
+    next_upload_id: int = 1
     tokens: set[UUID] = field(default_factory=set)
     down: bool = False
 
@@ -141,9 +157,36 @@ class FakeDb:
         newest = {r["study_uid"]: r for r in sorted(self.review_rows, key=lambda r: r["id"])}
         return {k: v for k, v in newest.items() if study_uid in (None, k)}
 
-    def uploaded(self) -> dict[str, str]:
+    def uploaded(self) -> set[str]:
         self._check()
-        return dict(self.uploads)
+        rows = {v for r in self.upload_rows for v in (r["study_uid"], r["orthanc_study_id"])}
+        return set(self.uploads) | rows
+
+    def find_upload(self, sha256: str) -> dict[str, Any] | None:
+        self._check()
+        found = [r for r in self.upload_rows if r["sha256"] == sha256]
+        return found[-1] if found else None
+
+    def reserve_upload_id(self) -> int:
+        self._check()
+        self.next_upload_id += 1
+        return self.next_upload_id - 1
+
+    def add_upload(self, upload: NewUpload) -> dict[str, Any]:
+        self._check()
+        row = {**upload.__dict__, "created_at": T0}
+        self.upload_rows.append(row)
+        self.audit_rows.append(
+            {
+                "id": len(self.audit_rows) + 1,
+                "created_at": T0,
+                "actor": upload.uploader,
+                "event": "upload",
+                "study_uid": upload.study_uid,
+                "details": {"upload_id": upload.id, "kind": upload.kind},
+            }
+        )
+        return row
 
     def reviews(self, study_uid: str) -> list[dict[str, Any]]:
         self._check()
@@ -250,7 +293,7 @@ def test_worklist_status_review_and_source(
         {"id": 2, "study_uid": "1.3", "decision": "reject", "created_at": T0},
         {"id": 3, "study_uid": "1.4", "decision": "approve", "created_at": T0},
     ]
-    db.uploads = {"failed": "upload.dcm"}
+    db.uploads = {"failed"}
     found = statuses(client)
     print(found)
     assert found == {
