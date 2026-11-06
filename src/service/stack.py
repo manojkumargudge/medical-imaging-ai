@@ -19,6 +19,7 @@ TEST_SETTINGS = {
     "RESULTS_DB_PORT": "15434",
     "RESULTS_DB_NAME": TEST["db_name"],
     "API_PORT": "18000",
+    "FRONTEND_PORT": "18080",
     "WORKER_RESULTS_DIR": "./results/worker-test",
 }
 

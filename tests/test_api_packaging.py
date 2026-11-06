@@ -55,6 +55,27 @@ def test_the_api_service_is_local_only_and_holds_the_orthanc_credentials() -> No
     assert environment["ORTHANC_URL"] == "http://orthanc:8042"
 
 
+def test_the_frontend_service_is_local_only_and_has_no_credentials() -> None:
+    compose: dict[str, Any] = yaml.safe_load(
+        (REPO_ROOT / "docker-compose.frontend.yml").read_text(encoding="utf-8")
+    )
+    frontend = compose["services"]["frontend"]
+    assert frontend["ports"] == ["127.0.0.1:${FRONTEND_PORT:-8080}:8080"]
+    assert "environment" not in frontend and "volumes" not in frontend
+    nginx = (REPO_ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    assert "proxy_pass http://api:8000;" in nginx and "8042" not in nginx
+    assert "Content-Security-Policy" in nginx
+
+
+def test_the_frontend_image_pins_its_base_images() -> None:
+    lines = (REPO_ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8").splitlines()
+    images = [line.split()[1] for line in lines if line.startswith("FROM")]
+    assert images and all(re.search(r":\d+\.\d+\.\d+-", image) for image in images)
+    package = (REPO_ROOT / "frontend" / "package.json").read_text(encoding="utf-8")
+    assert not re.search(r'"[\^~]', package)  # exact versions only
+
+
 def test_the_test_stack_api_has_its_own_port_and_results_folder() -> None:
     assert TEST_SETTINGS["API_PORT"] != "8000"
+    assert TEST_SETTINGS["FRONTEND_PORT"] != "8080"
     assert TEST_SETTINGS["WORKER_RESULTS_DIR"] != "./results/worker"
