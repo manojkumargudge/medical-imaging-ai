@@ -1,8 +1,10 @@
-# The API image (Dockerfile.api): src/api and what it imports, without torch, MONAI or nibabel.
+# The API image (Dockerfile.api): src/api and what it imports, without torch or MONAI.
+# nibabel reads the worker's CT masks (NIfTI) for the CT endpoints.
 # Same pins as pyproject.toml (tests/test_api_packaging.py checks).
 fastapi==0.161.1
 python-multipart==0.0.32
 uvicorn==0.53.0
+nibabel==5.4.2
 numpy==2.4.6
 pillow==13.0.0
 psycopg[binary]==3.3.6

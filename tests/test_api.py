@@ -297,12 +297,12 @@ def test_worklist_status_review_and_source(
     found = statuses(client)
     print(found)
     assert found == {
-        "rx": ("receiving", "none", "demo"),
-        "waiting": ("processing", "none", "demo"),
-        "done": ("done", "rejected", "demo"),  # the newest review is the current state
+        "rx": ("receiving", "none", "unknown"),
+        "waiting": ("processing", "none", "unknown"),
+        "done": ("done", "rejected", "unknown"),  # the newest review is the current state
         "failed": ("failed", "approved", "upload"),
-        "mr": ("no_model", "none", "demo"),
-        "both": ("processing", "none", "demo"),
+        "mr": ("no_model", "none", "unknown"),
+        "both": ("processing", "none", "unknown"),
     }
     first = client.get("/api/studies").json()["studies"][0]
     assert first["patient_id"].startswith("patient-") and first["updated_at"].endswith("+00:00")

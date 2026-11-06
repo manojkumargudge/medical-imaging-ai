@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import os
+import random
 import time
 import urllib.request
 import uuid
@@ -19,16 +20,19 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import nibabel as nib
 import numpy as np
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from pydicom import dcmread
 from stack_helpers import REPO_ROOT, integration_db_url, integration_orthanc, integration_values
 from test_worker import classifier, ct_series, segmenter
 from test_worker_integration import tagged_dx
 
 from scripts import upload_demo
+from src.api import ct as ct_view
 from src.api import studies
 from src.api.app import Services, create_app, load_thresholds
 from src.api.db import PostgresDatabase
@@ -99,7 +103,11 @@ def test_a_study_from_upload_to_review(stack: tuple[Orthanc, str], tmp_path: Pat
         time.sleep(1)
     found = entry(api, study_id)
     seen.append(found["status"])
-    assert (found["modality"], found["review_status"], found["source"]) == ("DX", "none", "demo")
+    assert (found["modality"], found["review_status"], found["source"]) == (
+        "DX",
+        "none",
+        "unknown",
+    )  # not a demo study, not an upload
     assert found["patient_id"] == str(ds.PatientID) and found["study_uid"] == uid
 
     cam = Path(uid) / studies.CLASSIFIER / "x_Cardiomegaly_cam.png"
@@ -432,3 +440,105 @@ def test_the_frontend_proxy_takes_uploads_over_1_mb(stack: tuple[Orthanc, str]) 
     )
     print(f"{len(data)} bytes through nginx: {response.status_code}")
     assert response.status_code == 201, response.text
+
+
+# ---- CT slices and the mask on the DICOM grid ----
+
+
+def test_ct_slices_and_mask_on_the_test_stack(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    tag = uuid.uuid4().hex[:8]
+    shape = (20, 16, 7)
+    affine = np.diag([-0.8, -0.8, 2.5, 1.0])
+    # Slice k holds HU -160 + 50 k: its windowed grey level shows which slice came back.
+    volume = np.broadcast_to(-160 + 50 * np.arange(shape[2]), shape).astype(np.int16)
+    nib.save(nib.Nifti1Image(volume, affine), tmp_path / "ct.nii.gz")
+    paths = convert.nifti_to_ct_series(tmp_path / "ct.nii.gz", tmp_path / "dcm", f"ctit{tag}")
+    datasets = [dcmread(p) for p in paths]
+    numbers = list(range(1, len(datasets) + 1))
+    random.Random(3).shuffle(numbers)  # InstanceNumbers that do not follow the slices
+    for ds, number in zip(datasets, numbers, strict=True):
+        ds.InstanceNumber = number
+        orthanc.upload(upload_demo.dicom_bytes(ds))
+    uid = str(datasets[0].StudyInstanceUID)
+    [study_id] = orthanc.find_study(uid)
+
+    # The worker's mask, stored on another grid (i flipped, i and j swapped), as the U-Net's is.
+    label = np.zeros(shape, dtype=np.uint8)
+    label[6:13, 4:10, 2:5] = 1
+    flip = np.eye(4)
+    flip[0, 0], flip[0, 3] = -1, shape[0] - 1
+    results_dir = tmp_path / "results"
+    relative = f"{uid}/monai-unet-spleen/series_spleen_mask.nii.gz"
+    (results_dir / relative).parent.mkdir(parents=True)
+    stored = np.transpose(label[::-1, :, :], (1, 0, 2))
+    _, ras = convert.read_ct_series(paths)
+    nib.save(nib.Nifti1Image(stored, ras @ flip @ np.eye(4)[[1, 0, 2, 3]]), results_dir / relative)
+    voxel_ml = 0.8 * 0.8 * 2.5 / 1000
+    results = {"series": [{"mask": relative, "spleen_ml": float(label.sum()) * voxel_ml}]}
+    execute(
+        url,
+        "INSERT INTO inference_results (study_uid, orthanc_study_id, modality, model, "
+        "checkpoint_name, checkpoint_sha256, status, results, seconds) "
+        "VALUES (%s, %s, 'CT', %s, 'fake.pt', 'sha-ct-test', 'ok', %s, 1.0) RETURNING id",
+        (uid, study_id, studies.SEGMENTATION, json.dumps(results)),
+    )
+
+    cache = tmp_path / "cache"
+    api = TestClient(
+        create_app(
+            Services(
+                replace(orthanc, timeout=10),
+                PostgresDatabase(url),
+                results_dir,
+                load_thresholds(THRESHOLDS),
+                ct_view.CtCache(cache),
+            )
+        )
+    )
+    meta = api.get(f"/api/studies/{study_id}/ct/meta").json()
+    print(f"CT meta: {meta}")
+    assert (meta["slices"], meta["mask"], meta["first_mask_slice"], meta["last_mask_slice"]) == (
+        7,
+        True,
+        2,
+        4,
+    )
+    assert meta["window"] == {"center": 40.0, "width": 400.0}
+    assert meta["spleen_ml_dicom_grid"] == pytest.approx(meta["spleen_ml"], rel=0.03)
+
+    for k in range(shape[2]):
+        with Image.open(io.BytesIO(api.get(f"/api/studies/{study_id}/ct/slice/{k}").content)) as im:
+            grey = np.asarray(im)
+        assert grey.shape == (shape[1], shape[0])  # rows, columns
+        assert np.all(grey == round(50 * k / 400 * 255)), f"slice {k} is out of order"
+        with Image.open(io.BytesIO(api.get(f"/api/studies/{study_id}/ct/mask/{k}").content)) as im:
+            alpha = np.asarray(im)[..., 3] > 0
+        assert np.array_equal(alpha, label[:, :, k].T > 0), f"mask slice {k} misplaced"
+    for k in (7, -1, 1000):
+        assert api.get(f"/api/studies/{study_id}/ct/slice/{k}").status_code == 404
+        assert api.get(f"/api/studies/{study_id}/ct/mask/{k}").status_code == 404
+    assert len(list(cache.glob("*.npz"))) == 1  # resampled once, then from the cache
+
+    dx_uid = upload_demo.upload_dx(orthanc, tagged_dx(tag))["study_uid"]
+    [dx_id] = orthanc.find_study(dx_uid)
+    response = api.get(f"/api/studies/{dx_id}/ct/meta")
+    assert response.status_code == 404 and "no CT series" in response.json()["detail"]
+
+
+def test_a_missing_mask_file_still_serves_the_slices(
+    stack: tuple[Orthanc, str], tmp_path: Path
+) -> None:
+    """The API container (port API_PORT) does not see the test's mask files: slices only."""
+    port = integration_values()["API_PORT"]
+    body = json.loads(
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/studies", timeout=30).read()
+    )
+    cts = [s for s in body["studies"] if s["modality"] == "CT" and s["status"] == "done"]
+    assert cts, "run test_ct_slices_and_mask_on_the_test_stack first (same session)"
+    base = f"http://127.0.0.1:{port}/api/studies/{cts[0]['id']}/ct"
+    meta = json.loads(urllib.request.urlopen(f"{base}/meta", timeout=30).read())
+    print(f"container CT meta without the mask file: {meta}")
+    assert meta["slices"] > 0 and meta["mask"] is False and meta["first_mask_slice"] is None
+    with urllib.request.urlopen(f"{base}/slice/0", timeout=30) as response:
+        assert response.headers["Content-Type"] == "image/png"

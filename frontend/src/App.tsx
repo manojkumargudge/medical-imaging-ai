@@ -12,20 +12,24 @@ export interface Route {
   page: "worklist" | "study" | "audit" | "upload";
   id?: string;
   label?: string;
+  slice?: number; // 1-based, CT only
 }
 
-/** "#/" -> worklist; "#/audit" -> audit log; "#/studies/<id>?label=<label>" -> one study. */
+/** "#/" -> worklist; "#/audit" -> audit log; "#/upload" -> upload;
+ * "#/studies/<id>?label=<label>&slice=<n>" -> one study (label for DX, slice for CT). */
 export function parseRoute(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?");
   if (path === "/audit") return { page: "audit" };
   if (path === "/upload") return { page: "upload" };
   const match = /^\/studies\/([^/]+)$/.exec(path);
   if (!match?.[1]) return { page: "worklist" };
-  const label = new URLSearchParams(query).get("label") ?? undefined;
-  return { page: "study", id: decodeURIComponent(match[1]), label };
+  const params = new URLSearchParams(query);
+  const label = params.get("label") ?? undefined;
+  const slice = Number(params.get("slice")) || undefined;
+  return { page: "study", id: decodeURIComponent(match[1]), label, slice };
 }
 
-function StudyPage({ id, label }: { id: string; label?: string }) {
+function StudyPage({ id, label, slice }: { id: string; label?: string; slice?: number }) {
   const [data, setData] = useState<{ detail: StudyDetail; thresholds: Thresholds } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +49,7 @@ function StudyPage({ id, label }: { id: string; label?: string }) {
   const kind = viewerKind(data.detail.study.modality);
   if (kind === "dx")
     return <DxView detail={data.detail} thresholds={data.thresholds} initialLabel={label} />;
-  if (kind === "ct") return <CtView detail={data.detail} />;
+  if (kind === "ct") return <CtView detail={data.detail} initialSlice={slice} />;
   return <p>No viewer for modality {data.detail.study.modality || "unknown"}.</p>;
 }
 
@@ -67,7 +71,7 @@ export function App() {
           <p>
             <a href="#/">← Worklist</a>
           </p>
-          <StudyPage id={route.id} label={route.label} />
+          <StudyPage id={route.id} label={route.label} slice={route.slice} />
         </>
       ) : (
         <Worklist />

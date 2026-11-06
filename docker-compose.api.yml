@@ -24,7 +24,10 @@ services:
       ORTHANC_PASSWORD: ${ORTHANC_PASSWORD}
       RESULTS_DB_URL: postgresql://aiml02:${RESULTS_DB_PASSWORD}@results-db:5432/${RESULTS_DB_NAME:-aiml02_results}
       RESULTS_DIR: /results
+      # CT masks resampled to the DICOM grid (.npz), next to the read-only worker outputs.
+      CT_CACHE_DIR: /cache
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - ${WORKER_RESULTS_DIR:-./results/worker}:/results:ro
+      - ${API_CACHE_DIR:-./results/api-cache}:/cache

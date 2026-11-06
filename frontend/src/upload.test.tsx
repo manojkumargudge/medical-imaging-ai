@@ -123,13 +123,13 @@ test("API errors and duplicates are shown", async () => {
   );
 });
 
-test("the DX view warns about model scope for uploads only", () => {
+test("the DX view warns about model scope for every study that is not a demo study", () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response(JSON.stringify({ reviews: [] }))),
   );
   const thresholds: Thresholds = { labels: {}, note: "" };
-  for (const source of ["upload", "demo"] as const) {
+  for (const source of ["upload", "unknown", "demo"] as const) {
     const detail = {
       study: {
         id: "s",
@@ -148,7 +148,7 @@ test("the DX view warns about model scope for uploads only", () => {
     } satisfies StudyDetail;
     render(<DxView detail={detail} thresholds={thresholds} />);
     const warning = screen.queryByLabelText("Model scope warning");
-    expect(warning?.textContent?.includes(SCOPE_WARNING) ?? false).toBe(source === "upload");
+    expect(warning?.textContent?.includes(SCOPE_WARNING) ?? false).toBe(source !== "demo");
     cleanup();
   }
 });

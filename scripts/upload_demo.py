@@ -25,12 +25,13 @@ from pydicom.dataset import Dataset
 
 from src.dicom import convert
 from src.service.orthanc import Orthanc, load_env
+from src.service.stack import DEMO_NIH_IMAGES, DEMO_SPLEEN_CASE
 
 DEMO = Path("data/raw/demo/images_001/images")
-DEFAULT_PNGS = (DEMO / "00000116_000.png", DEMO / "00000013_021.png")
+DEFAULT_PNGS = tuple(DEMO / name for name in DEMO_NIH_IMAGES)
 DATA_ENTRY = Path("data/raw/Data_Entry_2017.csv")
 SPLEEN_IMAGES = Path("data/raw/Task09_Spleen/imagesTr")
-DEFAULT_SPLEEN_CASE = "spleen_14"  # a test case in docs/results_seg.md
+DEFAULT_SPLEEN_CASE = DEMO_SPLEEN_CASE  # the API's demo list: src/service/stack.py
 
 
 def dx_from_png(png_path: Path, data_entry: Path) -> Dataset:

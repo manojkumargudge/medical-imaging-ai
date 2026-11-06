@@ -10,7 +10,7 @@ Processing status of a study:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -87,3 +87,13 @@ def description(study: Mapping[str, Any], series: Iterable[Mapping[str, Any]]) -
     for one in series:
         found = found or str(one.get("MainDicomTags", {}).get("SeriesDescription") or "")
     return found
+
+
+def source(
+    study_id: str, study_uid: str, uploaded: Collection[str], demo_uids: Collection[str]
+) -> str:
+    """upload (in the uploads table), demo (one of scripts/upload_demo.py's studies, by UID), or
+    unknown (anything else: the viewer shows the model-scope warning for it)."""
+    if study_id in uploaded or study_uid in uploaded:
+        return "upload"
+    return "demo" if study_uid in demo_uids else "unknown"
