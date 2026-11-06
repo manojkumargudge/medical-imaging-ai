@@ -7,6 +7,8 @@ first (the migrations only add). Rows written here stay in the test database: re
 audit log are append-only by design.
 """
 
+import hashlib
+import io
 import json
 import os
 import time
@@ -16,19 +18,26 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import httpx
+import numpy as np
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from stack_helpers import REPO_ROOT, integration_db_url, integration_orthanc, integration_values
+from test_worker import classifier, ct_series, segmenter
 from test_worker_integration import tagged_dx
 
 from scripts import upload_demo
 from src.api import studies
 from src.api.app import Services, create_app, load_thresholds
 from src.api.db import PostgresDatabase
+from src.dicom import convert
 from src.dicom.render import to_png
 from src.service import migrate
 from src.service.orthanc import Orthanc
+from src.service.store import PostgresStore
+from src.service.worker import Worker
 
 pytestmark = [
     pytest.mark.integration,
@@ -285,3 +294,141 @@ def test_reviews_on_the_test_database(stack: tuple[Orthanc, str], tmp_path: Path
         after = count(url, f"SELECT count(*) FROM {table} WHERE study_uid = %s", (uid,))
         print(f"{table}: rows before {before}, after UPDATE/DELETE attempts {after}")
         assert before > 0 and before == after
+
+
+# ---- uploads (POST /api/uploads) on the test stack ----
+
+
+def upload_png(width: int = 320, height: int = 300, seed: int | None = None) -> bytes:
+    rng = np.random.default_rng(seed if seed is not None else uuid.uuid4().int % 2**32)
+    buffer = io.BytesIO()
+    Image.fromarray(rng.integers(0, 256, (height, width), dtype=np.uint8)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def rows_for(url: str, sha256: str) -> tuple[int, int]:
+    uploads_rows = count(url, "SELECT count(*) FROM uploads WHERE sha256 = %s", (sha256,))
+    audit_rows = count(
+        url,
+        "SELECT count(*) FROM audit_log WHERE event = 'upload' AND details ->> 'sha256' = %s",
+        (sha256,),
+    )
+    return uploads_rows, audit_rows
+
+
+def post_file(api: Any, data: bytes, name: str = "jane-doe-chest.png") -> Any:
+    return api.post(
+        "/api/uploads",
+        files={"file": (name, data, "application/octet-stream")},
+        data={"uploader": "Integration Test"},
+    )
+
+
+def test_an_uploaded_png_is_processed_to_done(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    api = client(orthanc, url, tmp_path)
+    # The worker with fake models (no checkpoints on the test stack), on the test database.
+    store = PostgresStore(url)
+    store.set_last_seq(int(orthanc.get_json("/changes?last")["Last"]))
+    worker = Worker(orthanc, store, [classifier(), segmenter()], tmp_path, log=lambda _: None)
+
+    data = upload_png()
+    sha256 = hashlib.sha256(data).hexdigest()
+    response = post_file(api, data)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    study_id, upload_id = body["study_id"], body["upload_id"]
+    seen = [entry(api, study_id)["status"]]
+    deadline = time.monotonic() + 90
+    while entry(api, study_id)["status"] != "done":
+        assert time.monotonic() < deadline, f"not done: {entry(api, study_id)}"
+        worker.poll_once()
+        time.sleep(1)
+    found = entry(api, study_id)
+    seen.append(found["status"])
+    store.close()
+    print(f"upload {upload_id}: {seen}; worklist entry {found}")
+    assert seen[0] in ("receiving", "processing") and seen[-1] == "done"
+    assert (found["source"], found["description"], found["modality"]) == (
+        "upload",
+        f"Upload {upload_id}",
+        "DX",
+    )
+    assert (
+        found["patient_id"] == f"UPLOAD-{upload_id}" and "of 13 above threshold" in found["summary"]
+    )
+
+    [instance] = orthanc.get_json(f"/studies/{study_id}/instances")
+    stored = orthanc.get_bytes(f"/instances/{instance['ID']}/file")
+    assert b"jane-doe" not in stored  # the file name is not in the DICOM
+    for path in ("/api/studies", f"/api/studies/{study_id}", "/api/audit?page_size=200"):
+        assert "jane-doe" not in api.get(path).text  # nor anywhere the viewer reads
+    assert rows_for(url, sha256) == (1, 1)
+
+
+def test_a_de_identified_dx_dicom_is_accepted(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    ds = convert.png_to_dx(upload_png(), "SRC-IT", source=uuid.uuid4().hex)  # 320x300, valid
+    original_uid = str(ds.StudyInstanceUID)
+    data = upload_demo.dicom_bytes(ds)
+    response = post_file(client(orthanc, url, tmp_path), data, name="scan.dcm")
+    assert response.status_code == 201, response.text
+    study = orthanc.get_json(f"/studies/{response.json()['study_id']}")
+    assert study["MainDicomTags"]["StudyInstanceUID"] != original_uid
+    assert rows_for(url, hashlib.sha256(data).hexdigest()) == (1, 1)
+
+
+def test_rejected_uploads_add_no_rows(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    api = client(orthanc, url, tmp_path)
+    ct = upload_demo.dicom_bytes(ct_series(tmp_path, f"up{uuid.uuid4().hex[:6]}")[0])
+    no_phi_flag = tagged_dx(uuid.uuid4().hex[:8])
+    del no_phi_flag.PatientIdentityRemoved
+    cases = [
+        ("CT", ct, 422, "CT needs a full series; not supported for upload"),
+        ("PHI flag", upload_demo.dicom_bytes(no_phi_flag), 422, "PatientIdentityRemoved"),
+        ("too small", upload_png(100, 100), 422, "each side must be 256 to 4096"),
+        ("fake PNG", b"\x89PNG\r\n\x1a\n" + uuid.uuid4().bytes * 50, 422, "not a valid PNG"),
+        ("over 20 MB", b"\x89PNG\r\n\x1a\n" + bytes(20 * 1024 * 1024), 413, "larger than 20 MB"),
+    ]
+    for name, data, status, message in cases:
+        response = post_file(api, data)
+        print(f"{name}: {response.status_code} {response.json()['detail']}")
+        assert response.status_code == status and message in response.json()["detail"]
+        assert rows_for(url, hashlib.sha256(data).hexdigest()) == (0, 0)
+
+
+def test_a_duplicate_links_to_the_first_study(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    api = client(orthanc, url, tmp_path)
+    data = upload_png()
+    first, second = post_file(api, data), post_file(api, data, name="other-name.png")
+    print(f"duplicate: {first.status_code} then {second.status_code} {second.json()}")
+    assert (first.status_code, second.status_code) == (201, 200)
+    assert second.json()["study_id"] == first.json()["study_id"] and second.json()["duplicate"]
+    assert rows_for(url, hashlib.sha256(data).hexdigest()) == (1, 1)
+
+
+def test_orthanc_down_is_503_and_adds_no_rows(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
+    orthanc, url = stack
+    closed = replace(orthanc, url="http://127.0.0.1:1", timeout=3)
+    data = upload_png()
+    response = post_file(client(closed, url, tmp_path), data)
+    print(response.status_code, response.json())
+    assert response.status_code == 503 and "Orthanc is not reachable" in response.json()["detail"]
+    assert rows_for(url, hashlib.sha256(data).hexdigest()) == (0, 0)
+
+
+def test_the_frontend_proxy_takes_uploads_over_1_mb(stack: tuple[Orthanc, str]) -> None:
+    """nginx allows 21 MB on /api/uploads only (1 MB elsewhere)."""
+    port = integration_values()["FRONTEND_PORT"]
+    data = upload_png(1400, 1400)
+    assert len(data) > 1024 * 1024
+    response = httpx.post(
+        f"http://127.0.0.1:{port}/api/uploads",
+        files={"file": ("big.png", data, "image/png")},
+        data={"uploader": "Integration Test"},
+        timeout=60,
+    )
+    print(f"{len(data)} bytes through nginx: {response.status_code}")
+    assert response.status_code == 201, response.text

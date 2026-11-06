@@ -31,7 +31,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import nibabel as nib
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
@@ -215,6 +214,8 @@ def nifti_to_ct_series(
     series_description: str = "",
 ) -> list[Path]:
     """One CT file per slice (k axis) into an empty folder; returns the paths in slice order."""
+    import nibabel as nib  # here, not at the top: the API image (PNG -> DX only) has no nibabel
+
     if out_dir.exists() and any(out_dir.iterdir()):
         raise ValueError(f"{out_dir} is not empty; not overwriting")
     image = nib.load(nifti)

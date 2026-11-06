@@ -153,7 +153,7 @@ def test_worklist_study_name_and_summary(setup: Setup) -> None:
     orthanc.add("ct", "1.3", {"CT": [dx(3)]})
     db.add_result("1.3", studies.SEGMENTATION, series=[{"spleen_ml": 440.764875}])
     orthanc.add("up", "1.4", {"DX": [dx(4)]})
-    db.uploads = {"up": "my_scan.dcm"}
+    db.uploads = {"up"}
     orthanc.state["studies"]["named"]["MainDicomTags"]["StudyDescription"] = (  # type: ignore[attr-defined]
         named.StudyDescription
     )
@@ -163,6 +163,6 @@ def test_worklist_study_name_and_summary(setup: Setup) -> None:
     assert found["s"]["summary"] == f"{above} of 13 above threshold"
     assert found["ct"]["summary"] == "Spleen 440.8 mL"
     assert found["named"]["description"] == "NIH ChestX-ray14 00000116_000.png"
-    assert found["up"]["description"] == "my_scan.dcm" and found["up"]["source"] == "upload"
+    assert found["up"]["description"] == "" and found["up"]["source"] == "upload"  # no file name
     assert found["named"]["summary"] is None  # no result yet
     assert len(LABELS) == 14 and sum(t["threshold"] is not None for t in thresholds.values()) == 13

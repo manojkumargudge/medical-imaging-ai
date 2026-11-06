@@ -11,6 +11,7 @@ import { statusBadge } from "../status";
 import { CamOverlay } from "./CamOverlay";
 import { BadgeView } from "./Layout";
 import { ReviewPanel } from "./ReviewPanel";
+import { ScopeWarning } from "./ScopeWarning";
 import { ScoresTable } from "./ScoresTable";
 
 export function KnownLimits() {
@@ -93,6 +94,7 @@ export function DxView({
         DX study, patient {detail.study.patient_id}{" "}
         <BadgeView badge={statusBadge(detail.study.status)} />
       </h1>
+      {detail.study.source === "upload" && <ScopeWarning />}
       {!result && (
         <p>No classifier result for this study yet. The image is shown without an overlay.</p>
       )}

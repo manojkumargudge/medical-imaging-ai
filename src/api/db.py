@@ -47,6 +47,18 @@ class NewReview:
     submit_token: UUID
 
 
+@dataclass(frozen=True)
+class NewUpload:
+    id: int
+    uploader: str
+    kind: str
+    filename: str  # kept in the database only; never in the DICOM or an API response
+    size_bytes: int
+    sha256: str
+    study_uid: str
+    orthanc_study_id: str
+
+
 ALREADY_SAVED = "already saved: this review was submitted before (same submit token)"
 NEWER_RESULT = "a newer result exists for this study; reload the page and review the newest one"
 
@@ -62,8 +74,20 @@ class Database(Protocol):
         """study UID -> its newest review."""
         ...
 
-    def uploaded(self) -> dict[str, str]:
-        """Orthanc study ID or StudyInstanceUID -> file name, for studies in uploads."""
+    def uploaded(self) -> set[str]:
+        """Orthanc study IDs and StudyInstanceUIDs recorded in uploads."""
+        ...
+
+    def find_upload(self, sha256: str) -> dict[str, Any] | None:
+        """The newest upload of a file with this sha256."""
+        ...
+
+    def reserve_upload_id(self) -> int:
+        """The next uploads ID, taken before Orthanc is called (its UIDs are seeded by it)."""
+        ...
+
+    def add_upload(self, upload: NewUpload) -> dict[str, Any]:
+        """Insert the uploads row and its audit row in one transaction; returns the upload."""
         ...
 
     def reviews(self, study_uid: str) -> list[dict[str, Any]]:
@@ -135,18 +159,72 @@ class PostgresDatabase:
 
         return {row["study_uid"]: row for row in self._run(query)}
 
-    def uploaded(self) -> dict[str, str]:
+    def uploaded(self) -> set[str]:
         def query(connection: psycopg.Connection[dict[str, Any]]) -> list[dict[str, Any]]:
-            return connection.execute(
-                "SELECT orthanc_study_id, study_uid, filename FROM uploads ORDER BY id"
-            ).fetchall()
+            return connection.execute("SELECT orthanc_study_id, study_uid FROM uploads").fetchall()
 
-        found: dict[str, str] = {}
+        found: set[str] = set()
         for row in self._run(query):
-            for key in (row["orthanc_study_id"], row["study_uid"]):
-                if key:
-                    found[key] = row["filename"]
+            found.update(value for value in row.values() if value)
         return found
+
+    def find_upload(self, sha256: str) -> dict[str, Any] | None:
+        def query(connection: psycopg.Connection[dict[str, Any]]) -> dict[str, Any] | None:
+            return connection.execute(
+                "SELECT id, study_uid, orthanc_study_id FROM uploads WHERE sha256 = %s "
+                "ORDER BY id DESC LIMIT 1",
+                (sha256,),
+            ).fetchone()
+
+        return self._run(query)
+
+    def reserve_upload_id(self) -> int:
+        def query(connection: psycopg.Connection[dict[str, Any]]) -> int:
+            row = connection.execute(
+                "SELECT nextval(pg_get_serial_sequence('uploads', 'id')) AS id"
+            ).fetchone()
+            if row is None:
+                raise DatabaseUnavailableError("could not reserve an upload ID")
+            return int(row["id"])
+
+        return self._run(query)
+
+    def add_upload(self, upload: NewUpload) -> dict[str, Any]:
+        def query(connection: psycopg.Connection[dict[str, Any]]) -> dict[str, Any]:
+            row = connection.execute(
+                "INSERT INTO uploads (id, uploader, kind, filename, size_bytes, sha256, "
+                "study_uid, orthanc_study_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+                "RETURNING id, uploader, kind, size_bytes, sha256, study_uid, orthanc_study_id, "
+                "created_at",
+                (
+                    upload.id,
+                    upload.uploader,
+                    upload.kind,
+                    upload.filename,
+                    upload.size_bytes,
+                    upload.sha256,
+                    upload.study_uid,
+                    upload.orthanc_study_id,
+                ),
+            ).fetchone()
+            if row is None:
+                raise DatabaseUnavailableError("the upload was not recorded")
+            details = {
+                "upload_id": upload.id,
+                "kind": upload.kind,
+                "size_bytes": upload.size_bytes,
+                "sha256": upload.sha256,
+                "orthanc_study_id": upload.orthanc_study_id,
+                "uploader_verified": False,
+            }
+            connection.execute(
+                "INSERT INTO audit_log (actor, event, study_uid, details) "
+                "VALUES (%s, 'upload', %s, %s)",
+                (upload.uploader, upload.study_uid, json.dumps(details)),
+            )
+            return row
+
+        return self._run(query)
 
     def reviews(self, study_uid: str) -> list[dict[str, Any]]:
         def query(connection: psycopg.Connection[dict[str, Any]]) -> list[dict[str, Any]]:

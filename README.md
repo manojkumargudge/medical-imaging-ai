@@ -477,9 +477,10 @@ review rules, the audit trigger, and the append-only triggers.
 
 ## Viewer API
 
-`src/api/` is the viewer's own API (FastAPI). Its only write is a review, saved with its audit
-row in one transaction. For education only, not for clinical use. The browser talks only to this API: the Orthanc credentials are in the API
-container's environment and nowhere else. The port is bound to 127.0.0.1.
+`src/api/` is the viewer's own API (FastAPI). Its writes are a review and an upload, each saved
+with its audit row in one transaction. For education only, not for clinical use. The browser
+talks only to this API: the Orthanc credentials are in the API container's environment and
+nowhere else. The port is bound to 127.0.0.1.
 
 | endpoint | returns |
 |---|---|
@@ -492,6 +493,25 @@ container's environment and nowhere else. The port is bound to 127.0.0.1.
 | `GET /api/studies/{id}/reviews` | the study's reviews, newest first |
 | `POST /api/studies/{id}/reviews` | save a review: `decision` (`approve` or `reject`), `reviewer`, `comment` (required to reject), `submit_token` (a UUID), `inference_result_id` (the result the reviewer saw) |
 | `GET /api/audit?page=&page_size=` | the audit log, newest first, paged (at most 200 per page) |
+| `POST /api/uploads` | one file (`file`) and the uploader's name (`uploader`): a PNG or a DX/CR DICOM, stored in Orthanc as a new study |
+
+An upload is checked by its content, never by its name (`src/api/uploads.py`):
+
+- **PNG:** the PNG signature, mode L, RGB or RGBA, and an image that decodes. It is converted to
+  a DX image with `png_to_dx`, PatientID `UPLOAD-<id>`.
+- **DICOM:** the `DICM` preamble and pixel data the worker can read; modality DX or CR (a CT
+  answers 422 "CT needs a full series; not supported for upload"); `PatientIdentityRemoved` must
+  be `YES`.
+- At most 20 MB (413 above), each side 256 to 4096 pixels (422 otherwise).
+- New UIDs seeded by the upload ID and the file's sha256, so an upload never collides with
+  another study; StudyDescription `Upload <id>`. The file name is kept in the `uploads` table
+  only: it is never written into the DICOM or returned by the API.
+- The same file again (same sha256, and its study still in Orthanc) answers 200 with the
+  earlier study and adds nothing.
+- The `uploads` row and its audit row (`event = upload`) are written only after Orthanc has
+  stored the study. Orthanc down: 503 and no rows.
+
+nginx allows 21 MB request bodies on `/api/uploads` only (1 MB elsewhere).
 
 A review answers 409 if its submit token was saved before ("already saved"), or if
 `inference_result_id` is not the study's newest result of that model ("a newer result exists,
@@ -499,9 +519,8 @@ reload"); 422 for a missing or invalid field, including a reject without a comme
 database checks that too). The review and an audit row (`event = review`) are written in one
 transaction. Reviewer names are typed in and not verified: there is no login.
 
-Study name: the DICOM StudyDescription, else the first SeriesDescription, else the uploaded file
-name. The converter sets StudyDescription (the NIH image name, or the MSD case) from this
-change on; studies uploaded before it show the series description or nothing. Summary: for DX,
+Study name: the DICOM StudyDescription, else the first SeriesDescription. The converter sets
+StudyDescription (the NIH image name, or the MSD case); an upload's is `Upload <id>`. Summary: for DX,
 how many of the 13 labels with a threshold are at or above it (Hernia is score only); for CT,
 the spleen volume from the mask.
 
@@ -562,7 +581,13 @@ Built so far:
   "Names are not verified (education demo)."
 - **Audit log:** a paged table, newest first (link in the header).
 
-Planned: upload and the CT slice view.
+- **Upload:** one PNG or DX/CR DICOM file and the uploader's name, checked in the browser first
+  (PNG or DICOM by content, at most 20 MB) and again by the API. Then the worklist opens, and the
+  new study refreshes until it is processed. A file uploaded before links to the earlier study.
+  The upload page, and the DX view of an uploaded study, warn: "Trained on NIH ChestX-ray14
+  frontal chest X-rays. Scores for other images have no meaning."
+
+Planned: the CT slice view.
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \

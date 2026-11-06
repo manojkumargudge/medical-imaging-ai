@@ -1,6 +1,7 @@
 # The API image (Dockerfile.api): src/api and what it imports, without torch, MONAI or nibabel.
 # Same pins as pyproject.toml (tests/test_api_packaging.py checks).
 fastapi==0.161.1
+python-multipart==0.0.32
 uvicorn==0.53.0
 numpy==2.4.6
 pillow==13.0.0

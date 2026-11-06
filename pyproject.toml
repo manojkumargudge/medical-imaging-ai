@@ -25,6 +25,8 @@ dependencies = [
 # which has no torch (tests/test_api_packaging.py checks both).
 api = [
     "fastapi==0.161.1",
+    # multipart form parsing for POST /api/uploads
+    "python-multipart==0.0.32",
     "uvicorn==0.53.0",
 ]
 dev = [

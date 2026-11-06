@@ -238,3 +238,17 @@ h3 {
 .pager button {
   font: inherit;
 }
+
+.warning {
+  border: 1px solid #e0a100;
+  background: #fff8e1;
+  color: #5c4100;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+}
+
+.field input[type="file"] {
+  border: none;
+  padding: 0;
+}
