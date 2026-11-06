@@ -520,6 +520,12 @@ def create_app(services: Services | None = None) -> FastAPI:
                 round(float(mask.sum()) * grid.voxel_ml, 3) if mask is not None else None
             ),
             "result_id": row["id"] if row else None,
+            # The slice and mask PNGs are shown anterior up, the patient's right on the left.
+            "orientation": grid.display.markers(),
+            "display_flips": {
+                "rows": grid.display.flip_rows,
+                "columns": grid.display.flip_columns,
+            },
             "notice": studies.NOTICE,
         }
 
@@ -536,7 +542,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         png = s.ct.slice_png((instance, k))
         if png is None:
             png = ct_view.windowed_png(
-                dcmread(io.BytesIO(s.get_bytes(f"/instances/{instance}/file")))
+                dcmread(io.BytesIO(s.get_bytes(f"/instances/{instance}/file"))), grid.display
             )
             s.ct.keep_slice((instance, k), png)
         return Response(
@@ -552,7 +558,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         if mask is None:
             raise HTTPException(404, "no spleen mask for this study")
         return Response(
-            ct_view.mask_png(mask[:, :, index]),
+            ct_view.mask_png(mask[:, :, index], grid.display),
             media_type="image/png",
             headers={"Cache-Control": "private, max-age=300"},
         )

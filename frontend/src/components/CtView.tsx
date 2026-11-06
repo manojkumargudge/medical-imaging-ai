@@ -97,6 +97,11 @@ export function CtView({ detail, initialSlice }: { detail: StudyDetail; initialS
                   data-testid="mask"
                 />
               )}
+              {(["top", "bottom", "left", "right"] as const).map((edge) => (
+                <span key={edge} className={`marker marker-${edge}`} data-testid={`marker-${edge}`}>
+                  {meta.orientation[edge]}
+                </span>
+              ))}
             </div>
             <div className="controls">
               <label>
@@ -152,7 +157,7 @@ export function CtView({ detail, initialSlice }: { detail: StudyDetail; initialS
               </label>
             </div>
             <p className="muted">
-              Window 40/400 (HU {-160} to 240). Arrow keys step through the slices.{" "}
+              Window 40/400 (HU {-160} to 240). Letters on the edges are patient directions (A anterior, P posterior, R right, L left). Arrow keys step through the slices.{" "}
               {meta.mask && meta.first_mask_slice !== null && meta.last_mask_slice !== null
                 ? `The mask is on slices ${meta.first_mask_slice + 1} to ${meta.last_mask_slice + 1}.`
                 : "No mask for this study."}

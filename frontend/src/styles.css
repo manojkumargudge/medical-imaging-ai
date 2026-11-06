@@ -252,3 +252,19 @@ h3 {
   border: none;
   padding: 0;
 }
+
+/* Patient-direction letters on the CT image edges. */
+.marker {
+  position: absolute;
+  color: #ffd54f;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  text-shadow: 0 0 3px #000;
+  pointer-events: none;
+}
+
+.marker-top { top: 6px; left: 50%; transform: translateX(-50%); }
+.marker-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.marker-left { left: 6px; top: 50%; transform: translateY(-50%); }
+.marker-right { right: 6px; top: 50%; transform: translateY(-50%); }

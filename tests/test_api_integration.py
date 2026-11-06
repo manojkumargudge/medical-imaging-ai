@@ -559,3 +559,56 @@ def test_a_missing_mask_file_still_serves_the_slices(
     with pytest.raises(urllib.error.HTTPError) as missing:
         urllib.request.urlopen(f"{base}/mask/0", timeout=30)
     assert missing.value.code == 404
+
+
+@pytest.mark.parametrize(
+    ("name", "ras_diagonal"),
+    [("standard", (-0.8, -0.8, 2.5)), ("flipped like the MSD series", (0.8, 0.8, 2.5))],
+)
+def test_ct_display_is_anterior_up_right_on_left(
+    stack: tuple[Orthanc, str], tmp_path: Path, name: str, ras_diagonal: tuple[float, ...]
+) -> None:
+    """A voxel at the patient's anterior-right corner shows at the top left of the slice and of
+    its mask, whatever the series' ImageOrientationPatient."""
+    orthanc, url = stack
+    shape = (10, 8, 3)
+    affine = np.diag([*ras_diagonal, 1.0])
+    lps = np.diag([-1.0, -1.0, 1.0, 1.0]) @ affine
+    # The in-plane voxel with the smallest LPS x (patient right) and y (anterior).
+    i = 0 if lps[0, 0] > 0 else shape[0] - 1
+    j = 0 if lps[1, 1] > 0 else shape[1] - 1
+    volume = np.full(shape, -1000, dtype=np.int16)
+    volume[i, j, :] = 240
+    nib.save(nib.Nifti1Image(volume, affine), tmp_path / "ct.nii.gz")
+    tag = uuid.uuid4().hex[:8]
+    paths = convert.nifti_to_ct_series(tmp_path / "ct.nii.gz", tmp_path / "dcm", f"or{tag}")
+    for path in paths:
+        orthanc.upload(path.read_bytes())
+    first = dcmread(paths[0], stop_before_pixels=True)
+    uid = str(first.StudyInstanceUID)
+    [study_id] = orthanc.find_study(uid)
+    label = np.zeros(shape, dtype=np.uint8)
+    label[i, j, :] = 1
+    results_dir = tmp_path / "results"
+    relative = f"{uid}/monai-unet-spleen/mask.nii.gz"
+    (results_dir / relative).parent.mkdir(parents=True)
+    nib.save(nib.Nifti1Image(label, affine), results_dir / relative)
+    results = {"series": [{"mask": relative, "spleen_ml": 0.0048}]}
+    execute(
+        url,
+        "INSERT INTO inference_results (study_uid, orthanc_study_id, modality, model, "
+        "checkpoint_name, checkpoint_sha256, status, results, seconds) "
+        "VALUES (%s, %s, 'CT', %s, 'fake.pt', 'sha-orient', 'ok', %s, 1.0) RETURNING id",
+        (uid, study_id, studies.SEGMENTATION, json.dumps(results)),
+    )
+    api = client(orthanc, url, results_dir)
+    meta = api.get(f"/api/studies/{study_id}/ct/meta").json()
+    iop = [float(v) for v in first.ImageOrientationPatient]
+    print(f"{name}: IOP {iop}, flips {meta['display_flips']}, markers {meta['orientation']}")
+    assert meta["orientation"] == {"top": "A", "bottom": "P", "left": "R", "right": "L"}
+    for k in range(shape[2]):
+        with Image.open(io.BytesIO(api.get(f"/api/studies/{study_id}/ct/slice/{k}").content)) as im:
+            slice_pixels = np.argwhere(np.asarray(im) > 0)
+        with Image.open(io.BytesIO(api.get(f"/api/studies/{study_id}/ct/mask/{k}").content)) as im:
+            mask_pixels = np.argwhere(np.asarray(im)[..., 3] > 0)
+        assert slice_pixels.tolist() == mask_pixels.tolist() == [[0, 0]]
