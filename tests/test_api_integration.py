@@ -13,6 +13,7 @@ import json
 import os
 import random
 import time
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import replace
@@ -529,16 +530,32 @@ def test_ct_slices_and_mask_on_the_test_stack(stack: tuple[Orthanc, str], tmp_pa
 def test_a_missing_mask_file_still_serves_the_slices(
     stack: tuple[Orthanc, str], tmp_path: Path
 ) -> None:
-    """The API container (port API_PORT) does not see the test's mask files: slices only."""
-    port = integration_values()["API_PORT"]
-    body = json.loads(
-        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/studies", timeout=30).read()
+    """The API container (port API_PORT) with a segmentation row whose mask file is not there:
+    the slices are served, without a mask."""
+    orthanc, url = stack
+    volume = np.full((16, 12, 4), 40, dtype=np.int16)
+    nib.save(nib.Nifti1Image(volume, np.diag([1.0, 1.0, 2.0, 1.0])), tmp_path / "ct.nii.gz")
+    tag = uuid.uuid4().hex[:8]
+    paths = convert.nifti_to_ct_series(tmp_path / "ct.nii.gz", tmp_path / "dcm", f"nomask{tag}")
+    for path in paths:
+        orthanc.upload(path.read_bytes())
+    uid = str(dcmread(paths[0], stop_before_pixels=True).StudyInstanceUID)
+    [study_id] = orthanc.find_study(uid)
+    results = {"series": [{"mask": f"{uid}/monai-unet-spleen/not-there.nii.gz", "spleen_ml": 1.0}]}
+    execute(
+        url,
+        "INSERT INTO inference_results (study_uid, orthanc_study_id, modality, model, "
+        "checkpoint_name, checkpoint_sha256, status, results, seconds) "
+        "VALUES (%s, %s, 'CT', %s, 'fake.pt', 'sha-no-mask', 'ok', %s, 1.0) RETURNING id",
+        (uid, study_id, studies.SEGMENTATION, json.dumps(results)),
     )
-    cts = [s for s in body["studies"] if s["modality"] == "CT" and s["status"] == "done"]
-    assert cts, "run test_ct_slices_and_mask_on_the_test_stack first (same session)"
-    base = f"http://127.0.0.1:{port}/api/studies/{cts[0]['id']}/ct"
+    port = integration_values()["API_PORT"]
+    base = f"http://127.0.0.1:{port}/api/studies/{study_id}/ct"
     meta = json.loads(urllib.request.urlopen(f"{base}/meta", timeout=30).read())
     print(f"container CT meta without the mask file: {meta}")
-    assert meta["slices"] > 0 and meta["mask"] is False and meta["first_mask_slice"] is None
+    assert (meta["slices"], meta["mask"], meta["first_mask_slice"]) == (4, False, None)
     with urllib.request.urlopen(f"{base}/slice/0", timeout=30) as response:
         assert response.headers["Content-Type"] == "image/png"
+    with pytest.raises(urllib.error.HTTPError) as missing:
+        urllib.request.urlopen(f"{base}/mask/0", timeout=30)
+    assert missing.value.code == 404
