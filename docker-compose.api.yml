@@ -1,7 +1,7 @@
-# The viewer API, added to docker-compose.yml. Demo:
-#   docker compose -f docker-compose.yml -f docker-compose.api.yml up -d --build --wait
+# The viewer API, added to docker-compose.base.yml. Demo:
+#   docker compose -f docker-compose.base.yml -f docker-compose.api.yml up -d --build --wait
 # Test stack (its own port, database and results folder from .env.test):
-#   docker compose -p aiml02-test --env-file .env.test -f docker-compose.yml \
+#   docker compose -p aiml02-test --env-file .env.test -f docker-compose.base.yml \
 #       -f docker-compose.api.yml up -d --build --wait
 # The Orthanc credentials are only in this container's environment: the browser talks to the
 # API, never to Orthanc. Port bound to 127.0.0.1 only. For education only, not for clinical use.

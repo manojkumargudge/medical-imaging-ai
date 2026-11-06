@@ -262,6 +262,22 @@ def public_review(row: dict[str, Any] | None) -> dict[str, Any] | None:
     return {**row, "created_at": iso(row["created_at"])} if row else None
 
 
+def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
+    """Error responses for the OpenAPI document (docs/openapi.json, docs/api.md)."""
+    text = {
+        404: "Unknown study, label or slice, or no such result file (path checks failed).",
+        409: "Review conflict: the submit token was saved before, or a newer result exists.",
+        413: "The uploaded file is larger than 20 MB.",
+        422: "Missing or invalid input; `detail` says what (one sentence).",
+        503: "Orthanc or the results database is down, or Orthanc refused the credentials.",
+    }
+    return {code: {"description": text[code], "model": ErrorBody} for code in codes}
+
+
+class ErrorBody(BaseModel):
+    detail: str
+
+
 def create_app(services: Services | None = None) -> FastAPI:
     app = FastAPI(title="AIML-02 viewer API", description=studies.NOTICE)
     app.state.services = services
@@ -285,7 +301,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     async def db_down(_: Request, error: DatabaseUnavailableError) -> JSONResponse:
         return JSONResponse({"detail": str(error)}, status_code=503)
 
-    @app.get("/api/health")
+    @app.get("/api/health", responses=_errors(503))
     def health() -> JSONResponse:
         s = svc()
         checks: dict[str, Any] = {}
@@ -305,7 +321,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         body = {"status": "ok" if ok else "unavailable", **checks, "notice": studies.NOTICE}
         return JSONResponse(body, status_code=200 if ok else 503)
 
-    @app.get("/api/studies")
+    @app.get("/api/studies", responses=_errors(503))
     def list_studies() -> dict[str, Any]:
         s = svc()
         orthanc_studies = s.get_json("/studies?expand")
@@ -332,7 +348,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         items.sort(key=lambda item: item["updated_at"] or "", reverse=True)
         return {"studies": items, "notice": studies.NOTICE}
 
-    @app.get("/api/studies/{study_id}")
+    @app.get("/api/studies/{study_id}", responses=_errors(404, 503))
     def study_detail(study_id: str) -> dict[str, Any]:
         s = svc()
         study = s.known_study(study_id)
@@ -357,7 +373,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             "notice": studies.NOTICE,
         }
 
-    @app.get("/api/studies/{study_id}/image")
+    @app.get("/api/studies/{study_id}/image", responses=_errors(404, 422, 503))
     def dx_image(study_id: str) -> Response:
         s = svc()
         s.known_study(study_id)
@@ -376,7 +392,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             raise HTTPException(422, f"cannot show this image: {error}") from None
         return Response(png, media_type="image/png")
 
-    @app.get("/api/studies/{study_id}/cam/{label}")
+    @app.get("/api/studies/{study_id}/cam/{label}", responses=_errors(404, 503))
     def raw_cam(study_id: str, label: str) -> Response:
         s = svc()
         if label not in s.labels:
@@ -399,14 +415,18 @@ def create_app(services: Services | None = None) -> FastAPI:
             raise HTTPException(404, "raw map file not found")
         return Response(path.read_bytes(), media_type="image/png")
 
-    @app.get("/api/studies/{study_id}/reviews")
+    @app.get("/api/studies/{study_id}/reviews", responses=_errors(404, 503))
     def list_reviews(study_id: str) -> dict[str, Any]:
         s = svc()
         uid = str(s.known_study(study_id)["MainDicomTags"].get("StudyInstanceUID", ""))
         rows = s.db.reviews(uid)
         return {"reviews": [public_review(row) for row in rows], "notice": studies.NOTICE}
 
-    @app.post("/api/studies/{study_id}/reviews", status_code=201)
+    @app.post(
+        "/api/studies/{study_id}/reviews",
+        status_code=201,
+        responses=_errors(404, 409, 422, 503),
+    )
     def add_review(study_id: str, review: ReviewIn) -> dict[str, Any]:
         s = svc()
         uid = str(s.known_study(study_id)["MainDicomTags"].get("StudyInstanceUID", ""))
@@ -427,7 +447,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             raise HTTPException(422, str(error)) from None
         return {"review": public_review(row)}
 
-    @app.post("/api/uploads", status_code=201)
+    @app.post("/api/uploads", status_code=201, responses=_errors(413, 422, 503))
     def upload(file: UploadFile, uploader: Annotated[str, Form()]) -> JSONResponse:
         s = svc()
         name = uploader.strip()
@@ -483,7 +503,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         }
         return JSONResponse(body, status_code=201)
 
-    @app.get("/api/audit")
+    @app.get("/api/audit", responses=_errors(422, 503))
     def audit(
         page: Annotated[int, Query(ge=1)] = 1,
         page_size: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -497,7 +517,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             "notice": studies.NOTICE,
         }
 
-    @app.get("/api/studies/{study_id}/ct/meta")
+    @app.get("/api/studies/{study_id}/ct/meta", responses=_errors(404, 503))
     def ct_meta(study_id: str) -> dict[str, Any]:
         s = svc()
         uid, grid, row = s.ct_grid(study_id)
@@ -534,7 +554,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             raise HTTPException(404, f"slice {k} is out of range (0 to {grid.shape[2] - 1})")
         return k
 
-    @app.get("/api/studies/{study_id}/ct/slice/{k}")
+    @app.get("/api/studies/{study_id}/ct/slice/{k}", responses=_errors(404, 422, 503))
     def ct_slice(study_id: str, k: int) -> Response:
         s = svc()
         _, grid, _ = s.ct_grid(study_id)
@@ -549,7 +569,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             png, media_type="image/png", headers={"Cache-Control": "private, max-age=300"}
         )
 
-    @app.get("/api/studies/{study_id}/ct/mask/{k}")
+    @app.get("/api/studies/{study_id}/ct/mask/{k}", responses=_errors(404, 422, 503))
     def ct_mask(study_id: str, k: int) -> Response:
         s = svc()
         uid, grid, row = s.ct_grid(study_id)

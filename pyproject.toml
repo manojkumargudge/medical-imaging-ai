@@ -93,5 +93,5 @@ pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
     "real_data: needs the DVC outputs under data/ (skipped if absent)",
-    "integration: needs the docker-compose.yml services (run with AIML02_INTEGRATION=1)",
+    "integration: needs the docker-compose.base.yml services (run with AIML02_INTEGRATION=1)",
 ]

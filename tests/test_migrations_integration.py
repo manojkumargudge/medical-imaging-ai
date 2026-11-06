@@ -1,4 +1,4 @@
-"""The migrations on the real Postgres from docker-compose.yml: tables, rules and triggers.
+"""The migrations on the real Postgres from docker-compose.base.yml: tables, rules and triggers.
 
 Runs only with AIML02_INTEGRATION=1 against the test stack (.env.test, compose project
 aiml02-test), never the demo; the database name is checked first. Each test works in a new

@@ -1,4 +1,4 @@
-"""Upload to the real Orthanc from docker-compose.yml, then find the studies there.
+"""Upload to the real Orthanc from docker-compose.base.yml, then find the studies there.
 
 Runs only with AIML02_INTEGRATION=1 against the test stack (.env.test, compose project
 aiml02-test), never the demo; the Orthanc name is checked first. Synthetic images only.

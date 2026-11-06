@@ -11,21 +11,38 @@ with an audit log. Results are measured on named splits only: the classifier in
 [docs/limitations.md](docs/limitations.md). Progress against the brief is tracked in
 [docs/brief-evidence.md](docs/brief-evidence.md).
 
+## Documentation and screenshots
+
+- [docs/architecture.md](docs/architecture.md): how data, models and studies flow (Mermaid
+  diagram).
+- [docs/api.md](docs/api.md): every viewer API endpoint, its inputs and error codes;
+  [docs/openapi.json](docs/openapi.json) is the exported OpenAPI document.
+- [docs/limitations.md](docs/limitations.md): limits and bias, in plain terms.
+- Screenshots of the demo stack (taken by viewing only: nothing was saved, selected or uploaded):
+  - [worklist](docs/screenshots/demo_worklist.png)
+  - [DX 00000116_000 with the Cardiomegaly Grad-CAM overlay](docs/screenshots/demo_dx_116_cardiomegaly_overlay.png)
+  - [DX 00000116_000 scores table, Model scope and Known limits panels](docs/screenshots/demo_dx_116_scores_scope_limits.png)
+    ([full page](docs/screenshots/demo_dx_116_full_page.png))
+  - [DX 00000013_021](docs/screenshots/demo_dx_13.png)
+  - [CT spleen_14, slice 34, mask on, A/P/R/L markers](docs/screenshots/demo_ct_spleen_14_slice34_mask.png)
+  - [upload page (empty)](docs/screenshots/demo_upload_page_empty.png)
+  - [audit log](docs/screenshots/demo_audit_log.png)
+  - [review panel with history, from the test stack (synthetic test data and test reviews)](docs/screenshots/test_data_review_panel_with_history.png)
+
 ## Quick start: the whole demo stack
 
 ```
 cp .env.example .env                # set the passwords and the two checkpoint paths
-python -m src.service.migrate       # once: the results database tables
 docker compose up -d --build --wait # Orthanc, results DB, worker, API, frontend
+python -m src.service.migrate       # once, with the stack up: the viewer's tables and triggers
 python -m scripts.upload_demo       # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
 ```
 
-Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.yml`,
+Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
 service has a healthcheck (the worker's reads a heartbeat file it touches after each poll), each
 waits for the services it needs, every port is bound to 127.0.0.1, and every image is pinned to
-a version. Compose warns that it found both `compose.yaml` and `docker-compose.yml` and uses
-`compose.yaml`; that is expected. `docker compose down` stops and removes the containers and
+a version. `docker compose down` stops and removes the containers and
 keeps the volumes (Orthanc studies, results database); do not add `-v` unless you mean to delete
 them.
 
@@ -54,8 +71,8 @@ them.
 - `src/api/`: the viewer's read-only API (FastAPI), `Dockerfile.api`, `docker-compose.api.yml`
 - `migrations/`: numbered SQL for the results database, applied by `src/service/migrate.py`
 - `compose.yaml`: the whole demo stack in one command
-- `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `limitations.md`,
-  `eda.md`, `results.md`, `results_v2.md`, `results_seg.md`, `dicom-notes.md`
+- `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `architecture.md`,
+  `api.md` and `openapi.json`, `limitations.md`, `screenshots/`, `eda.md`, `results.md`, `results_v2.md`, `results_seg.md`, `dicom-notes.md`
 
 ## Setup
 
@@ -332,7 +349,7 @@ Run `notebooks/colab_seg.ipynb` on a GPU runtime. It downloads the data to the V
 
 ## Orthanc and the results database
 
-`docker-compose.yml` runs two services, for synthetic or public de-identified data only:
+`docker-compose.base.yml` runs two services, for synthetic or public de-identified data only:
 
 - **Orthanc** (`orthancteam/orthanc:26.9.1`):
   - REST API and web UI on `127.0.0.1:8042`, with basic auth on.
@@ -345,7 +362,7 @@ Run `notebooks/colab_seg.ipynb` on a GPU runtime. It downloads the data to the V
 
 ```
 cp .env.example .env              # then set both passwords; .env is never committed
-docker compose -f docker-compose.yml up -d --wait   # Orthanc and the results DB only
+docker compose -f docker-compose.base.yml up -d --wait   # Orthanc and the results DB only
 python -m scripts.upload_demo     # 2 NIH demo PNGs as DX, MSD spleen_14 as a CT series
 ```
 
@@ -431,10 +448,11 @@ They are set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in `.env` 
 read-only. They are never in the image or in git, and a test checks both. The worker logs each
 checkpoint's sha256 at start-up, and every result row records it.
 
-Worker time per study on CPU: 6 runs each inside the worker container, the first left out as
-warm-up, so the median and range are of 5 warm runs (`reports/worker_timing.json`):
+Worker time per study on CPU: 6 runs each inside the worker container. The first run in a new
+process is the cold run (one-off set-up costs) and is shown on its own; the median and range are
+of the 5 warm runs after it (`reports/worker_timing.json`):
 
-| study | model | median | range | first run (left out) |
+| study | model | warm median | warm range | cold first run |
 |---|---|---|---|---|
 | DX 00000116_000 (1 image) | classifier + Grad-CAM for 14 labels | 6.9 s | 5.5 to 21.8 s | 6.0 s |
 | DX 00000013_021 (1 image) | classifier + Grad-CAM for 14 labels | 7.6 s | 7.0 to 10.3 s | 10.5 s |
@@ -457,7 +475,7 @@ docker compose exec worker python -m src.service.timing --runs 6 --warm-up 1
 - **Grad-CAM:** most of the DX time. It runs one forward and backward pass per label.
 
 ```
-docker compose -f docker-compose.yml -f docker-compose.worker.yml up -d --build
+docker compose -f docker-compose.base.yml -f docker-compose.worker.yml up -d --build
 python -m scripts.upload_demo
 python -m scripts.check_worker    # real checks against the published outputs
 ```
@@ -595,7 +613,7 @@ The API image (`Dockerfile.api`, `requirements-api.txt`) has no torch or MONAI; 
 
 ```
 python -m src.service.migrate                         # once: the API reads the viewer's tables
-docker compose -f docker-compose.yml -f docker-compose.api.yml up -d --build --wait
+docker compose -f docker-compose.base.yml -f docker-compose.api.yml up -d --build --wait
 curl http://127.0.0.1:8000/api/studies
 ```
 
@@ -646,7 +664,7 @@ Built so far:
 
 
 ```
-docker compose -f docker-compose.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \
+docker compose -f docker-compose.base.yml -f docker-compose.api.yml -f docker-compose.frontend.yml \
     up -d --build --wait                  # http://127.0.0.1:8080 (FRONTEND_PORT)
 cd frontend && npm ci && npm run dev      # development: http://127.0.0.1:5173, /api -> :8000
 cd frontend && npm run typecheck && npm test

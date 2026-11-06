@@ -1,5 +1,5 @@
-# The inference worker, added to docker-compose.yml (compose.yaml starts the whole demo stack):
-#   docker compose -f docker-compose.yml -f docker-compose.worker.yml up -d --build
+# The inference worker, added to docker-compose.base.yml (compose.yaml starts the whole demo stack):
+#   docker compose -f docker-compose.base.yml -f docker-compose.worker.yml up -d --build
 # CLASSIFIER_CHECKPOINT and SEGMENTATION_CHECKPOINT in .env are paths on this machine, outside
 # the repository; each file is mounted read-only. Checkpoints are never in the image or in git.
 
