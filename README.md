@@ -1,13 +1,33 @@
-**For education only, not for clinical use.**
+**For education only. Not for clinical use.**
 
 # Medical Imaging AI (AIML-02)
 
-Status: the NIH ChestX-ray14 metadata is split by patient, and the 41 labelled MSD Task09_Spleen
-CT volumes are split by case (EDA of both in [docs/eda.md](docs/eda.md)). The NIH preprocessing
-stage, the DenseNet121 classifier and the 3D U-Net are written and tested on synthetic data, but
-**none has been run on real images yet**: no model has been trained and there are no results
-([docs/results.md](docs/results.md)). Progress against the brief is tracked in
+A teaching project: chest X-rays (NIH ChestX-ray14) are classified by a DenseNet121 with
+Grad-CAM maps, CT volumes (MSD Task09_Spleen) are segmented by a 3D U-Net, studies flow through
+an Orthanc DICOM server and an inference worker, and a React viewer shows the results for review
+with an audit log. Results are measured on named splits only: the classifier in
+[docs/results_v2.md](docs/results_v2.md), the segmentation in
+[docs/results_seg.md](docs/results_seg.md). What the models and the system cannot do is in
+[docs/limitations.md](docs/limitations.md). Progress against the brief is tracked in
 [docs/brief-evidence.md](docs/brief-evidence.md).
+
+## Quick start: the whole demo stack
+
+```
+cp .env.example .env                # set the passwords and the two checkpoint paths
+python -m src.service.migrate       # once: the results database tables
+docker compose up -d --build --wait # Orthanc, results DB, worker, API, frontend
+python -m scripts.upload_demo       # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
+```
+
+Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.yml`,
+`docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
+service has a healthcheck (the worker's reads a heartbeat file it touches after each poll), each
+waits for the services it needs, every port is bound to 127.0.0.1, and every image is pinned to
+a version. Compose warns that it found both `compose.yaml` and `docker-compose.yml` and uses
+`compose.yaml`; that is expected. `docker compose down` stops and removes the containers and
+keeps the volumes (Orthanc studies, results database); do not add `-v` unless you mean to delete
+them.
 
 ## Layout
 
@@ -33,8 +53,9 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `frontend/`: the React viewer (Vite, TypeScript), `docker-compose.frontend.yml`
 - `src/api/`: the viewer's read-only API (FastAPI), `Dockerfile.api`, `docker-compose.api.yml`
 - `migrations/`: numbered SQL for the results database, applied by `src/service/migrate.py`
-- `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `eda.md`,
-  `results.md`, `dicom-notes.md`
+- `compose.yaml`: the whole demo stack in one command
+- `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `limitations.md`,
+  `eda.md`, `results.md`, `results_v2.md`, `results_seg.md`, `dicom-notes.md`
 
 ## Setup
 
@@ -324,7 +345,7 @@ Run `notebooks/colab_seg.ipynb` on a GPU runtime. It downloads the data to the V
 
 ```
 cp .env.example .env              # then set both passwords; .env is never committed
-docker compose up -d --wait
+docker compose -f docker-compose.yml up -d --wait   # Orthanc and the results DB only
 python -m scripts.upload_demo     # 2 NIH demo PNGs as DX, MSD spleen_14 as a CT series
 ```
 
@@ -410,19 +431,29 @@ They are set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in `.env` 
 read-only. They are never in the image or in git, and a test checks both. The worker logs each
 checkpoint's sha256 at start-up, and every result row records it.
 
-Worker time per study on CPU, from the `seconds` column, one run each after
-`scripts/reset_demo.py`:
+Worker time per study on CPU: 6 runs each inside the worker container, the first left out as
+warm-up, so the median and range are of 5 warm runs (`reports/worker_timing.json`):
 
-| study | model | time |
-|---|---|---|
-| DX 00000116_000 (1 image) | classifier + Grad-CAM for 14 labels | 24.2 s |
-| DX 00000013_021 (1 image) | classifier + Grad-CAM for 14 labels | 16.2 s |
-| CT spleen_14 (54 slices) | U-Net, sliding window | 58.5 s |
+| study | model | median | range | first run (left out) |
+|---|---|---|---|---|
+| DX 00000116_000 (1 image) | classifier + Grad-CAM for 14 labels | 6.9 s | 5.5 to 21.8 s | 6.0 s |
+| DX 00000013_021 (1 image) | classifier + Grad-CAM for 14 labels | 7.6 s | 7.0 to 10.3 s | 10.5 s |
+| CT spleen_14 (54 slices) | U-Net, sliding window | 13.7 s | 12.2 to 18.7 s | 66.6 s |
 
-- **Machine:** Intel Core i5-1235U laptop, Docker Desktop VM with 12 CPUs and 10 GB.
+```
+docker compose exec worker python -m src.service.timing --runs 6 --warm-up 1
+```
+
+- **Machine:** Intel Core i5-1235U laptop (2 performance and 8 efficiency cores), Docker Desktop
+  VM with 12 CPUs and 10 GB, on AC power.
 - **Threads:** the worker uses `WORKER_THREADS=4`.
-- **What is timed:** download from Orthanc, inference and writing outputs.
-- **First DX study:** it includes first-call overhead, so it is slower than the second.
+- **What is timed:** download from Orthanc, inference and writing outputs (as the worker's
+  `seconds` column). The outputs go to a temporary folder; nothing is written to the database.
+- **Why the spread:** the same study on the same machine has taken anywhere from 5.5 to 28.7 s
+  (DX) and 12.2 to 94.9 s (CT) across runs and days. The first run in a new process pays one-off
+  set-up costs (66.6 s against a 13.7 s median for CT); after that, the time depends on which
+  cores the VM's threads land on and on what else the laptop is doing. Earlier single-run
+  numbers (24.2, 16.2 and 58.5 s) were one point in that spread.
 - **Grad-CAM:** most of the DX time. It runs one forward and backward pass per label.
 
 ```
@@ -575,7 +606,7 @@ study from upload to review, 503s, and the API container). An `.env.test` writte
 change needs `API_PORT=18000`, `FRONTEND_PORT=18080` and
 `WORKER_RESULTS_DIR=./results/worker-test` added.
 
-## Viewer (Step 6, in progress)
+## Viewer
 
 `frontend/` is the React viewer (Vite, TypeScript). For education only, not for clinical use:
 every page carries the banner "For education only. Not for clinical use." The browser talks only

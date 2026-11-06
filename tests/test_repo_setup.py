@@ -14,7 +14,7 @@ def is_git_ignored(path: str) -> bool:
 
 def test_readme_starts_with_education_only_notice() -> None:
     lines = (REPO_ROOT / "README.md").read_text(encoding="utf-8").splitlines()
-    assert "For education only, not for clinical use" in lines[0]
+    assert "For education only. Not for clinical use." in lines[0]
 
 
 def test_dvc_sees_the_split_and_preprocess_stages() -> None:
