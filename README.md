@@ -30,6 +30,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 - `configs/`: configuration
 - `data/`: local data, gitignored
 - `reports/`: classifier metrics JSON (after the Colab run)
+- `src/api/`: the viewer's read-only API (FastAPI), `Dockerfile.api`, `docker-compose.api.yml`
 - `migrations/`: numbered SQL for the results database, applied by `src/service/migrate.py`
 - `docs/`: `brief.md` (the brief), `brief-evidence.md` (requirement tracker), `eda.md`,
   `results.md`, `dicom-notes.md`
@@ -38,7 +39,7 @@ stage, the DenseNet121 classifier and the 3D U-Net are written and tested on syn
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pip install -e ".[dev,api]"
 ```
 
 ## Data
@@ -439,6 +440,7 @@ Tests:
 The results database schema is in `migrations/`, as numbered SQL files applied in order by
 `src/service/migrate.py`. The table `schema_migrations` records each applied file and its
 sha256, and the runner refuses an applied file that has changed: add a new file instead.
+All pending files are applied in one transaction: if one fails, none is applied.
 Migrations only add tables and triggers, and nothing in them drops or deletes data.
 
 - `001_initial.sql`: the worker's tables (`inference_results`, `worker_state`) with
@@ -467,10 +469,52 @@ python -m src.service.migrate --env-file .env.test
 transaction that is rolled back: it checks an existing worker database keeps its rows, the
 review rules, the audit trigger, and the append-only triggers.
 
-## Viewer (Step 6, planned, not built)
+## Viewer API
+
+`src/api/` is the viewer's own API (FastAPI), read-only so far. For education only, not for
+clinical use. The browser talks only to this API: the Orthanc credentials are in the API
+container's environment and nowhere else. The port is bound to 127.0.0.1.
+
+| endpoint | returns |
+|---|---|
+| `GET /api/health` | database and Orthanc reachable, Orthanc name and stack (`demo` or `test`); 503 if either is down |
+| `GET /api/studies` | worklist: study, patient ID, modality, processing status, review status, source, updated time |
+| `GET /api/studies/{id}` | the study, its series, the newest result per model, the latest review |
+| `GET /api/studies/{id}/image` | the DX/CR image as an 8-bit PNG, from the DICOM file in Orthanc |
+| `GET /api/studies/{id}/cam/{label}` | the raw Grad-CAM map (8-bit grey 224px PNG) of the newest classifier result |
+| `GET /api/config/thresholds` | `configs/viewer_thresholds.yaml` and the note that scores are not calibrated probabilities |
+
+Processing status: `receiving` (Orthanc has not marked the study stable), `processing` (stable,
+no result row yet for a model that should run), `done`, `failed` (the newest row is an error),
+`no_model` (no DX, CR or CT series). Review status is the newest review: `none`, `approved` or
+`rejected`. Source is `upload` if the study is in `uploads`, otherwise `demo`.
+
+Safety checks:
+
+- `{id}` must be a study ID that Orthanc lists, and `{label}` one of the 14 labels, before any
+  file path is built. A stored file path must also resolve inside the results folder, which is
+  mounted read-only. Anything else is 404, including path-traversal attempts (tested).
+- Orthanc or the database down, or Orthanc refusing the credentials: 503, with a message
+  naming the service and the reason.
+
+The API image (`Dockerfile.api`, `requirements-api.txt`) has no torch, MONAI or nibabel.
+
+```
+python -m src.service.migrate                         # once: the API reads the viewer's tables
+docker compose -f docker-compose.yml -f docker-compose.api.yml up -d --build --wait
+curl http://127.0.0.1:8000/api/studies
+```
+
+The test stack runs its own API on port 18000 (`API_PORT` in `.env.test`), with its own results
+folder. Tests: `tests/test_api.py` (fake Orthanc and database), `tests/test_api_packaging.py`
+(pins, image contents, ports, mounts), and `tests/test_api_integration.py` (test stack only: a
+study from upload to review, 503s, and the API container). An `.env.test` written before this
+change needs `API_PORT=18000` and `WORKER_RESULTS_DIR=./results/worker-test` added.
+
+## Viewer (Step 6, in progress)
 
 A React viewer for the results the worker stores. For education only, not for clinical use. It
-will need a small API of its own, because there is none yet. Planned features:
+uses the viewer API above. Planned features:
 
 - **Upload a scan:** a DICOM file goes into Orthanc, and the worker picks it up as a new stable
   study. Demo or public de-identified data only.

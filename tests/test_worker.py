@@ -21,9 +21,10 @@ from torch import nn
 from src.data.eda import FINDINGS
 from src.data.preprocess import read_params
 from src.dicom import convert
+from src.dicom.render import to_png
 from src.explain import gradcam
 from src.models.segmentation import load_seg_config
-from src.service.analyzers import ClassifierAnalyzer, SegmentationAnalyzer, to_png
+from src.service.analyzers import ClassifierAnalyzer, SegmentationAnalyzer
 from src.service.orthanc import OrthancError
 from src.service.store import MemoryStore
 from src.service.worker import Worker

@@ -35,9 +35,9 @@ from pydicom import dcmread
 from scripts.upload_demo import DATA_ENTRY, DEFAULT_PNGS, DEFAULT_SPLEEN_CASE, dx_from_png
 from src.data.preprocess import read_params
 from src.dicom import convert
+from src.dicom.render import to_png
 from src.explain import gradcam
 from src.models.segmentation import build_transforms, load_seg_config
-from src.service.analyzers import to_png
 from src.service.orthanc import load_env
 from src.service.store import PostgresStore
 

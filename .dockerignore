@@ -3,6 +3,7 @@
 !params.yaml
 !src/
 !configs/
+!requirements-api.txt
 **/__pycache__
 **/*.pt
 **/*.pth

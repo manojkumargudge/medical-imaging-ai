@@ -21,8 +21,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The viewer API (src/api). requirements-api.txt pins the same versions for the API image,
+# which has no torch (tests/test_api_packaging.py checks both).
+api = [
+    "fastapi==0.161.1",
+    "uvicorn==0.53.0",
+]
 dev = [
     "dvc==3.67.1",
+    # fastapi.testclient needs httpx.
+    "httpx==0.28.1",
     # kaggle 2.2.5 imports six without declaring it.
     "kaggle==2.2.5",
     "mypy==2.4.1",

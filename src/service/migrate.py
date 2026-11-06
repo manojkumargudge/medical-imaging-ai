@@ -2,8 +2,8 @@
 
 Files are named `NNN_name.sql`, numbered from 001 without gaps. `schema_migrations` records each
 applied file with its sha256. An applied file that has changed since is an error: add a new file
-instead of editing an old one. Each file runs in its own transaction, together with its
-schema_migrations row, so a failing file leaves nothing half applied.
+instead of editing an old one. All pending files run in one transaction, each with its
+schema_migrations row (each file in a savepoint): if any file fails, none of them is applied.
 
 001 is the worker's schema from before migrations existed (IF NOT EXISTS), so it is a no-op on a
 database the worker already created. Migrations only add: nothing here drops or deletes data.
@@ -98,8 +98,9 @@ def applied_migrations(connection: psycopg.Connection) -> dict[int, tuple[str, s
 def migrate(
     connection: psycopg.Connection, migrations: Sequence[Migration], dry_run: bool = False
 ) -> list[Migration]:
-    """Apply the pending migrations, each in its own transaction (a savepoint inside an open
-    transaction, as in the tests); returns them."""
+    """Apply the pending migrations and return them. Each file runs in a savepoint inside one
+    open transaction, which the caller commits (main) or rolls back (the tests), so all pending
+    files are applied together or not at all."""
     pending = to_apply(applied_migrations(connection), migrations)
     if dry_run:
         return pending
