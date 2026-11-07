@@ -77,7 +77,9 @@ what a fresh clone took on the development laptop.
 
 Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
-service has a healthcheck (the worker's reads a heartbeat file it touches after each poll), each
+service has a healthcheck (the worker's reads a heartbeat file that it deletes on start, then
+touches after loading the models, after each study and after each poll; its start period is
+180 s), each
 waits for the services it needs, every port is bound to 127.0.0.1, and every image is pinned to
 a version. `docker compose down` stops and removes the containers and
 keeps the volumes (Orthanc studies, results database); do not add `-v` unless you mean to delete
@@ -520,6 +522,11 @@ only. It deletes:
 It keeps the viewer's tables (`reviews`, `audit_log`, `uploads`) and checks that their row
 counts are unchanged. A review refers to its result row, so the reset refuses, before deleting
 anything, while any review exists.
+
+`audit_log` is append-only: database triggers refuse UPDATE, DELETE and TRUNCATE. A reset
+therefore keeps the old audit rows, including the `inference_done` rows of the results it
+deletes. When the worker processes the re-uploaded studies, it adds one new `inference_done`
+row per result: 3 for the demo, so the count grows by 3 with every reset.
 
 It then re-uploads with `upload_demo.py`. It shows the counts and asks you to type `wipe` before
 deleting anything. It checks that it is on the demo stack by Orthanc name and database name, and
