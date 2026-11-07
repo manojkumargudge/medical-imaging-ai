@@ -23,8 +23,9 @@ services:
       RESULTS_DIR: /results
       WORKER_THREADS: "4"
       WORKER_HEARTBEAT: /tmp/worker-heartbeat
-    # The worker serves no HTTP: healthy while it has polled in the last 5 minutes (it touches
-    # the heartbeat file after every poll; a CT study takes up to about 95 s on this laptop).
+    # The worker serves no HTTP: healthy while it has touched its heartbeat file in the last 5
+    # minutes. It touches it after loading the models, after each study and after each poll (a
+    # CT study takes up to about 95 s on this laptop). start_period covers the model load.
     healthcheck:
       test:
         - CMD
@@ -34,7 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 120s
+      start_period: 180s
     volumes:
       - ${CLASSIFIER_CHECKPOINT:?set CLASSIFIER_CHECKPOINT in .env}:/checkpoints/classifier.pt:ro
       - ${SEGMENTATION_CHECKPOINT:?set SEGMENTATION_CHECKPOINT in .env}:/checkpoints/segmentation.pt:ro

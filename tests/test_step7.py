@@ -102,6 +102,37 @@ def test_the_worker_touches_its_heartbeat_after_each_poll(tmp_path: Path) -> Non
     assert heartbeat.exists()
 
 
+def test_the_worker_touches_its_heartbeat_after_each_study(tmp_path: Path) -> None:
+    """One poll with three new studies: the heartbeat is fresh after each one, not only at the
+    end of the poll (a long first poll after a reset used to fail the healthcheck)."""
+    import os
+
+    from test_worker import FakeOrthanc as WorkerOrthanc
+    from test_worker import dx
+
+    heartbeat = tmp_path / "heartbeat"
+    heartbeat.touch()
+    os.utime(heartbeat, (0, 0))  # "never touched"
+    seen: list[int] = []
+
+    class Recorder:
+        name, modalities = "fake", ("DX",)
+        checkpoint_name, checkpoint_sha256 = "fake.pt", "sha"
+
+        def analyze(self, *_: Any) -> dict[str, Any]:
+            seen.append(heartbeat.stat().st_mtime_ns)  # as each study starts
+            return {"instances": []}
+
+    orthanc = WorkerOrthanc()
+    for n in range(3):
+        orthanc.add_study(f"s{n}", [dx(n)])
+    worker = Worker(orthanc, MemoryStore(), [Recorder()], tmp_path, lambda _: None, heartbeat)  # type: ignore[list-item]
+    assert worker.poll_once() == 3
+    print(f"heartbeat mtime as each study started: {seen}")
+    assert seen[0] == 0 and seen[1] > 0 and seen[2] >= seen[1]
+    assert heartbeat.stat().st_mtime_ns >= seen[2]
+
+
 def test_timing_drops_the_warm_up_runs() -> None:
     summary = timing.summarise([60.0, 20.0, 30.0, 25.0, 22.0, 40.0], warm_up=1)
     assert summary == {

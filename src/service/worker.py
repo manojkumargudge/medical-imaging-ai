@@ -43,11 +43,19 @@ class Worker:
         analyzers: Sequence[Analyzer],
         results_dir: Path,
         log: Log = print,
+        heartbeat: Path | None = None,
     ) -> None:
         if not analyzers:
             raise ValueError("no model configured")
         self.orthanc, self.store, self.analyzers = orthanc, store, list(analyzers)
-        self.results_dir, self.log = results_dir, log
+        self.results_dir, self.log, self.heartbeat = results_dir, log, heartbeat
+
+    def beat(self) -> None:
+        """Touch the heartbeat file (if any). The Compose healthcheck reads its age, since the
+        worker serves no HTTP. Touched after the models load, after each study and after each
+        poll, so a poll with several new studies does not look like a hang."""
+        if self.heartbeat is not None:
+            self.heartbeat.touch()
 
     def poll_once(self, limit: int = 100) -> int:
         """Handle the next changes; returns how many were read."""
@@ -69,6 +77,7 @@ class Worker:
                 raise
             # Deleted since it became stable (e.g. scripts/reset_demo.py): nothing to do.
             self.log(f"study {orthanc_id} is no longer in Orthanc, skipped")
+            self.beat()
             return ["gone"]
         study_uid = str(study["MainDicomTags"]["StudyInstanceUID"])
         series = self.orthanc.get_json(f"/studies/{orthanc_id}/series")
@@ -106,11 +115,14 @@ class Worker:
             )
             self.log(f"{study_uid}: {analyzer.name} {status}, stored {added}")
             outcomes.append(status if added else "skipped")
+            self.beat()
+        self.beat()
         return outcomes
 
     def run(self, interval: float, heartbeat: Path | None = None) -> None:
-        """Poll forever. After each poll, successful or not, touch `heartbeat` (if given): the
-        Compose healthcheck reads its age, since the worker serves no HTTP."""
+        """Poll forever. After each poll, successful or not, touch the heartbeat (see beat)."""
+        if heartbeat is not None:
+            self.heartbeat = heartbeat
         while True:
             try:
                 if self.poll_once() == 0:
@@ -119,8 +131,7 @@ class Worker:
                 self.log(f"poll failed: {type(error).__name__}: {error}")
                 time.sleep(interval)
             finally:
-                if heartbeat is not None:
-                    heartbeat.touch()
+                self.beat()
 
 
 def analyzers_from_env() -> list[Analyzer]:
@@ -141,21 +152,24 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     load_env()
     torch.set_num_threads(int(os.environ.get("WORKER_THREADS", "4")))
+    heartbeat_env = os.environ.get("WORKER_HEARTBEAT")
+    heartbeat = Path(heartbeat_env) if heartbeat_env else None
     analyzers = analyzers_from_env()
     for analyzer in analyzers:
         print(f"{analyzer.name}: {analyzer.checkpoint_name} sha256 {analyzer.checkpoint_sha256}")
+    if heartbeat is not None:
+        heartbeat.touch()  # the models are loaded
     url = os.environ.get("RESULTS_DB_URL")
     if not url:
         raise ValueError("set RESULTS_DB_URL")
     store = PostgresStore(url)
     results_dir = Path(os.environ.get("RESULTS_DIR", "results/worker"))
-    worker = Worker(Orthanc.from_env(), store, analyzers, results_dir)
+    worker = Worker(Orthanc.from_env(), store, analyzers, results_dir, heartbeat=heartbeat)
     if args.once:
         while worker.poll_once():
             pass
     else:
-        heartbeat = os.environ.get("WORKER_HEARTBEAT")
-        worker.run(args.interval, Path(heartbeat) if heartbeat else None)
+        worker.run(args.interval)
 
 
 if __name__ == "__main__":
