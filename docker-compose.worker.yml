@@ -17,7 +17,7 @@ services:
       ORTHANC_URL: http://orthanc:8042
       ORTHANC_USER: ${ORTHANC_USER}
       ORTHANC_PASSWORD: ${ORTHANC_PASSWORD}
-      RESULTS_DB_URL: postgresql://aiml02:${RESULTS_DB_PASSWORD}@results-db:5432/aiml02_results
+      RESULTS_DB_URL: postgresql://aiml02:${RESULTS_DB_PASSWORD}@results-db:5432/${RESULTS_DB_NAME:-aiml02_results}
       CLASSIFIER_CHECKPOINT: /checkpoints/classifier.pt
       SEGMENTATION_CHECKPOINT: /checkpoints/segmentation.pt
       RESULTS_DIR: /results

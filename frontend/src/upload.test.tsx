@@ -130,13 +130,14 @@ test("the DX view warns about model scope for every study that is not a demo stu
   );
   const thresholds: Thresholds = { labels: {}, note: "" };
   for (const source of ["upload", "unknown", "demo"] as const) {
+    const modality = source === "unknown" ? "CR" : "DX"; // a real CR file is titled CR
     const detail = {
       study: {
         id: "s",
         study_uid: "1",
         patient_id: "UPLOAD-3",
         description: "Upload 3",
-        modality: "DX",
+        modality,
         status: "processing",
         review_status: "none",
         source,
@@ -149,6 +150,9 @@ test("the DX view warns about model scope for every study that is not a demo stu
     render(<DxView detail={detail} thresholds={thresholds} />);
     const warning = screen.queryByLabelText("Model scope warning");
     expect(warning?.textContent?.includes(SCOPE_WARNING) ?? false).toBe(source !== "demo");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(
+      new RegExp(`^${modality} study, patient UPLOAD-3`),
+    );
     cleanup();
   }
 });

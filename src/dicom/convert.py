@@ -99,6 +99,14 @@ def _file_meta(sop_class: str, sop_instance: str) -> FileMetaDataset:
     return meta
 
 
+def _code(value: str, scheme: str, meaning: str) -> Dataset:
+    item = Dataset()
+    item.CodeValue = value
+    item.CodingSchemeDesignator = scheme
+    item.CodeMeaning = meaning
+    return item
+
+
 def uid_for(*parts: str) -> str:
     """A new UID under pydicom's root, derived from the parts (same parts, same UID)."""
     return str(generate_uid(entropy_srcs=["aiml02", *parts]))
@@ -158,8 +166,31 @@ def png_to_dx(
     ds.ImageType = ["DERIVED", "SECONDARY"]
     ds.PresentationIntentType = "FOR PRESENTATION"
     ds.BodyPartExamined = "CHEST"
+    ds.AnatomicRegionSequence = [_code("51185008", "SCT", "Chest")]
+    ds.ImageLaterality = "U"  # the chest is unpaired
     ds.ViewPosition = view
-    ds.PatientOrientation = ""
+    # NIH frontal images are stored in the usual radiograph layout (the patient's left on the
+    # viewer's right, head up), so rows run to the patient's left and columns to the feet.
+    # Without a known view (uploads) the orientation is left empty: dciodvfy reports that.
+    ds.PatientOrientation = ["L", "F"] if view in {"PA", "AP"} else ""
+    # DX Image module (Type 1). The 8-bit pixels are shown as stored: identity rescale and
+    # Presentation LUT, a window over the full 0-255 range. NIH does not say how its PNGs relate
+    # to X-ray intensity; LOG with sign -1 (brighter = less intensity, as in MONOCHROME2
+    # radiographs from scanners) is assumed. Resizing to 1024 px and 8 bits is not lossy
+    # compression, and PNG is lossless, so LossyImageCompression is 00.
+    ds.PixelIntensityRelationship = "LOG"
+    ds.PixelIntensityRelationshipSign = -1
+    ds.RescaleIntercept = 0
+    ds.RescaleSlope = 1
+    ds.RescaleType = "US"
+    ds.PresentationLUTShape = "IDENTITY"
+    ds.LossyImageCompression = "00"
+    ds.WindowCenter = 128
+    ds.WindowWidth = 256
+    # Type 2: unknown for a converted PNG, so present and empty.
+    ds.DetectorType = ""
+    ds.PositionerType = ""
+    ds.AcquisitionContextSequence = []
     ds.PatientSex = sex if sex in {"M", "F"} else ""
     # Ages above 100 in NIH are recording errors; they are left out rather than copied.
     ds.PatientAge = f"{age:03d}Y" if age is not None and 0 <= age <= 100 else ""
@@ -248,6 +279,11 @@ def nifti_to_ct_series(
         ds.SeriesDescription = series_description
         ds.StudyDescription = series_description
         ds.ImageType = ["DERIVED", "SECONDARY", "AXIAL"]
+        # MSD Task09 cases are abdominal CTs (an unpaired region, so no Laterality). The
+        # patient position and acquisition number are unknown: Type 2, so present and empty.
+        ds.BodyPartExamined = "ABDOMEN"
+        ds.PatientPosition = ""
+        ds.AcquisitionNumber = ""
         ds.FrameOfReferenceUID = frame_uid
         ds.PositionReferenceIndicator = ""
         ds.KVP = ""

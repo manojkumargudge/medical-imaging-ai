@@ -28,6 +28,10 @@ with an audit log. Results are measured on named splits only: the classifier in
   - [upload page (empty)](docs/screenshots/demo_upload_page_empty.png)
   - [audit log](docs/screenshots/demo_audit_log.png)
   - [review panel with history, from the test stack (synthetic test data and test reviews)](docs/screenshots/test_data_review_panel_with_history.png)
+  - [real Fujifilm CR (MONOCHROME1) on the test stack, Nodule overlay, with the model-scope warning](docs/screenshots/test_tcia_covid19ar_cr_nodule.png).
+    The image is from TCIA COVID-19-AR (patient COVID-19-AR-16434356), CC BY 4.0: Desai S, et al.
+    (2020), The Cancer Imaging Archive, https://doi.org/10.7937/tcia.2020.py71-5978. The scores
+    have no meaning for this image.
 
 ## Quick start: the whole demo stack
 
@@ -184,6 +188,80 @@ geometry. What this proved is in [docs/dicom-notes.md](docs/dicom-notes.md).
 - UIDs are new, under pydicom's root, and derived from the source name. Reconverting the same file
   gives the same UIDs.
 - Existing files are never overwritten. `data/dicom/` is gitignored, like all data (`*.dcm`).
+- The DX files carry the DX Image module (chest anatomic region code, ImageLaterality U,
+  identity rescale and Presentation LUT, a 0-255 window, LOG / sign -1 pixel intensity). The CT
+  files carry BodyPartExamined ABDOMEN and empty PatientPosition and AcquisitionNumber. `dciodvfy`
+  finds no errors in either; see Known limitations below for its warnings.
+
+## Real scanner DICOMs
+
+Four real chest X-ray files, none of them in git, test the pipeline on scanner output rather
+than converted PNGs:
+
+| file | source | license | modality, photometric, transfer syntax, bits stored |
+|---|---|---|---|
+| `RG1_J2KR.dcm` | NEMA WG04 RG1 (Philips CR, chest PA) via pydicom-data | no formal license; local use only | CR, MONOCHROME1, JPEG 2000 lossless, 15 |
+| `RG1_J2KI.dcm` | the same image, lossy | no formal license; local use only | CR, MONOCHROME1, JPEG 2000 lossy, 15 |
+| `covid19ar_cr.dcm` | TCIA COVID-19-AR, COVID-19-AR-16434356 (Fujifilm CR) | CC BY 4.0 | CR, MONOCHROME1, Implicit VR Little Endian, 10 |
+| `covid19ar_dx.dcm` | TCIA COVID-19-AR, COVID-19-AR-16424105 (Philips DX, AP) | CC BY 4.0 | DX, MONOCHROME2, Implicit VR Little Endian, 12 |
+
+```
+python -m scripts.fetch_real_dicom    # data/raw/real_dicom/, sha256-checked, never overwrites
+python -m scripts.check_real_dicom    # test stack only (.env.test): upload, worker, API checks
+```
+
+`check_real_dicom` uploads each file to the test Orthanc, waits for the worker, and checks:
+
+- the 14 scores against the same pipeline run outside Docker (within 1e-6);
+- a raw Grad-CAM map for every label, which re-blends to the stored overlay within 1 grey level;
+- that the API serves the image and a map, and labels the study `unknown`, so the viewer shows
+  the model-scope warning.
+
+All four passed on 2026-11-07 ([reports/real_dicom_check.json](reports/real_dicom_check.json));
+`tests/test_real_dicom.py` checks that report. With the files present, it also checks the tags,
+the hashes, and that MONOCHROME1 renders inverted (bone bright). Without them, as in CI, those
+tests skip. JPEG 2000 is decoded by Pillow (already a dependency); no extra decoder was needed.
+RG1_J2KR and RG1_J2KI share all their UIDs, so the check gives the J2KI copy new UIDs derived
+from its hash; its compressed pixel data is sent unchanged.
+
+TCIA data: Desai S, et al. (2020). Data from Chest Imaging with Clinical and Genomic Correlates
+Representing a Rural COVID-19 Positive Population [Data set]. The Cancer Imaging Archive.
+https://doi.org/10.7937/tcia.2020.py71-5978 (CC BY 4.0). Also cite: Desai S, et al. Chest
+imaging representing a COVID-19 positive rural U.S. population. Scientific Data 7, 414 (2020).
+https://doi.org/10.1038/s41597-020-00741-6
+
+The scores on these files have no meaning. The model was trained on NIH ChestX-ray14 PNGs, and
+these files come from other scanners, other processing and a different population. They show
+that the files are read, displayed and run, not that the model works on them.
+
+## Known limitations
+
+General limits and bias are in [docs/limitations.md](docs/limitations.md). For DICOM:
+
+- **dciodvfy warnings on our generated files** (dicom3tools snapshot 20260927, 0 errors on the
+  NIH DX 00000116_000 and 00000013_021, and on all 54 slices of spleen_14):
+  - Study Date, Study Time and Study ID are empty (DICOMDIR warnings, 3 per file). They are
+    removed on purpose: no dates in de-identified data.
+  - DX only: no ViewCodeSequence, although ViewPosition (PA/AP) is set (1 warning).
+- **Uploaded PNGs** (`/api/uploads`) become DX with two dciodvfy errors that cannot be fixed
+  honestly: PatientOrientation and ImagerPixelSpacing are unknown for an arbitrary PNG, so they
+  are left out rather than made up.
+- **PixelIntensityRelationship** in our DX is LOG with sign -1 by assumption. NIH does not say
+  how its PNGs relate to X-ray intensity.
+- **Real scanner files have validator findings too.** These are not ours to fix, and the
+  pipeline does not need the attributes involved. Per file:
+
+  | file | dciodvfy errors | warnings | errors found |
+  |---|---|---|---|
+  | RG1 (both) | 2 | 15 | PixelSpacing is 0\0 |
+  | covid19ar_cr | 1 | 14 | Laterality present when not allowed |
+  | covid19ar_dx | 4 | 28 | empty ImageLaterality and code scheme, no AnatomicRegionSequence |
+- **Tested scanner formats are few.** Four files have been tested: MONOCHROME1 (CR), MONOCHROME2
+  (DX), JPEG 2000 lossless and lossy, and uncompressed. JPEG baseline/lossless, JPEG-LS, RLE,
+  multi-frame images, VOI LUT sequences and For Processing DX have not been tested on real files.
+- **Landscape images are squashed** to 224x224, as in training (a plain resize). The
+  Fujifilm CR is 2045 wide by 1378 high, so the model sees it distorted. The overlay is
+  stretched back over the full image, so it lines up with what the model saw.
 
 ## Data versioning (DVC remote on Google Drive)
 

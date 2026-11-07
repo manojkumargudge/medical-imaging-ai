@@ -287,6 +287,7 @@ def test_16_bit_monochrome1_is_scaled_and_inverted() -> None:
     ds.Rows, ds.Columns = pixels.shape
     ds.BitsAllocated, ds.BitsStored, ds.HighBit = 16, 12, 11
     ds.PhotometricInterpretation = "MONOCHROME1"
+    del ds.WindowCenter, ds.WindowWidth  # the 8-bit converter's 0-255 window
     ds.PixelData = pixels.tobytes()
     with Image.open(io.BytesIO(to_png(ds))) as image:
         assert np.asarray(image).tolist() == [[255, 191], [128, 0]]
