@@ -228,7 +228,11 @@ def count(url: str, query: str, params: tuple[Any, ...]) -> int:
 def test_reviews_on_the_test_database(stack: tuple[Orthanc, str], tmp_path: Path) -> None:
     orthanc, url = stack
     api = client(orthanc, url, tmp_path)
-    uid = upload_demo.upload_dx(orthanc, tagged_dx(uuid.uuid4().hex[:8]))["study_uid"]
+    # Modality OT: no model handles it, so a worker running on the test stack never adds a
+    # newer result to this study. The test then asserts only on the rows it made itself.
+    ds = tagged_dx(uuid.uuid4().hex[:8])
+    ds.Modality = "OT"
+    uid = upload_demo.upload_dx(orthanc, ds)["study_uid"]
     [study_id] = orthanc.find_study(uid)
     insert = (
         "INSERT INTO inference_results (study_uid, orthanc_study_id, modality, model, "
@@ -283,12 +287,14 @@ def test_reviews_on_the_test_database(stack: tuple[Orthanc, str], tmp_path: Path
         )
         for review_id in saved
     ]
-    total = count(url, "SELECT count(*) FROM reviews WHERE study_uid = %s", (uid,))
-    print(f"reviews saved {saved}, audit rows per review {audited}, reviews of the study {total}")
+    total = count(
+        url, "SELECT count(*) FROM reviews WHERE study_uid = %s AND id = ANY(%s)", (uid, saved)
+    )
+    print(f"reviews saved {saved}, audit rows per review {audited}, of them on the study {total}")
     assert audited == [1, 1] and total == 2
 
-    history = api.get(path).json()["reviews"]
-    assert [r["id"] for r in history] == saved[::-1]
+    history = [r["id"] for r in api.get(path).json()["reviews"] if r["id"] in saved]
+    assert history == saved[::-1]
     assert entry(api, study_id)["review_status"] == "rejected"
     page = api.get("/api/audit?page=1&page_size=5").json()
     assert page["total"] >= 2 and page["entries"][0]["details"]["review_id"] == saved[1]

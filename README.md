@@ -28,6 +28,10 @@ with an audit log. Results are measured on named splits only: the classifier in
   - [upload page (empty)](docs/screenshots/demo_upload_page_empty.png)
   - [audit log](docs/screenshots/demo_audit_log.png)
   - [review panel with history, from the test stack (synthetic test data and test reviews)](docs/screenshots/test_data_review_panel_with_history.png)
+  - [real Fujifilm CR (MONOCHROME1) on the test stack, Nodule overlay, with the model-scope warning](docs/screenshots/test_tcia_covid19ar_cr_nodule.png).
+    The image is from TCIA COVID-19-AR (patient COVID-19-AR-16434356), CC BY 4.0: Desai S, et al.
+    (2020), The Cancer Imaging Archive, https://doi.org/10.7937/tcia.2020.py71-5978. The scores
+    have no meaning for this image.
 
 ## Quick start: the whole demo stack
 

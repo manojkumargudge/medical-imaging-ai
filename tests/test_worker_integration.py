@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from pydicom.dataset import Dataset
+from pydicom.uid import generate_uid
 from stack_helpers import integration_db_url, integration_orthanc
 from test_worker import classifier, ct_series, dx, segmenter
 
@@ -29,9 +30,10 @@ pytestmark = [
 
 def tagged_dx(tag: str) -> Dataset:
     ds = dx(int(tag, 16) % 1000)
+    # New UIDs derived from the tag. (Appending the tag and cutting to 64 characters lost it,
+    # because dx()'s UIDs are already 64 long, so two runs could share a study UID.)
     for name in ("StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID"):
-        value = f"{getattr(ds, name)}.{int(tag, 16) % 10**6}"[:64]
-        setattr(ds, name, value)
+        setattr(ds, name, generate_uid(entropy_srcs=[str(getattr(ds, name)), tag]))
     ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
     return ds
 
