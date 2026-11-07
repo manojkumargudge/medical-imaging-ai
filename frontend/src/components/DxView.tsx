@@ -91,7 +91,7 @@ export function DxView({
   return (
     <>
       <h1>
-        DX study, patient {detail.study.patient_id}{" "}
+        {detail.study.modality || "DX"} study, patient {detail.study.patient_id}{" "}
         <BadgeView badge={statusBadge(detail.study.status)} />
       </h1>
       {detail.study.source !== "demo" && <ScopeWarning />}

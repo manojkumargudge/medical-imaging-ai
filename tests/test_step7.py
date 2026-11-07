@@ -63,6 +63,15 @@ def test_every_service_has_a_healthcheck_and_waits_for_what_it_needs() -> None:
         assert all(v["condition"] == "service_healthy" for v in depends.values())
 
 
+def test_worker_and_api_use_the_same_database_name() -> None:
+    """The test stack's database is aiml02_results_test (.env.test RESULTS_DB_NAME); a fixed
+    name in the worker's URL left it unable to connect there."""
+    found = services()
+    urls = {name: found[name]["environment"]["RESULTS_DB_URL"] for name in ("worker", "api")}
+    print(urls)
+    assert all(url.endswith("/${RESULTS_DB_NAME:-aiml02_results}") for url in urls.values())
+
+
 def test_ports_are_local_only_and_images_pinned() -> None:
     ports = [port for spec in services().values() for port in spec.get("ports", [])]
     print(ports)

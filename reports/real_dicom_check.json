@@ -1,0 +1,247 @@
+[
+  {
+    "file": "RG1_J2KR.dcm",
+    "source": "NEMA WG04 RG1 (Philips CR thorax) via pydicom-data",
+    "license": "no formal license (NEMA WG04 test data); local use only",
+    "transfer_syntax": "1.2.840.10008.1.2.4.90 (JPEG 2000 Image Compression (Lossless Only))",
+    "Modality": "CR",
+    "PhotometricInterpretation": "MONOCHROME1",
+    "BitsAllocated": "16",
+    "BitsStored": "15",
+    "Rows": "1955",
+    "Columns": "1841",
+    "Manufacturer": "Philips Medical Systems",
+    "ViewPosition": "PA",
+    "new_uids": false,
+    "worker_status": "ok",
+    "worker_seconds": 8.739,
+    "scores": {
+      "Mass": 0.327705,
+      "Edema": 0.003235,
+      "Hernia": 0.001516,
+      "Nodule": 0.344177,
+      "Effusion": 0.033874,
+      "Fibrosis": 0.006907,
+      "Emphysema": 0.014101,
+      "Pneumonia": 0.005529,
+      "Atelectasis": 0.019501,
+      "Cardiomegaly": 0.006955,
+      "Infiltration": 0.114482,
+      "Pneumothorax": 0.065745,
+      "Consolidation": 0.023283,
+      "Pleural_Thickening": 0.013177
+    },
+    "top3": [
+      "Nodule",
+      "Mass",
+      "Infiltration"
+    ],
+    "above_threshold": [
+      "Emphysema",
+      "Mass",
+      "Nodule",
+      "Pneumothorax"
+    ],
+    "max_score_diff_vs_local": 1.4901161193847656e-07,
+    "scores_match_local": true,
+    "cams_ok": true,
+    "api": {
+      "study_id": "6b34d082-d1af1e02-eb3ab3b1-1f03ba3a-e5700065",
+      "status": "done",
+      "source": "unknown",
+      "image": [
+        200,
+        "image/png",
+        1419718
+      ],
+      "cam": [
+        200,
+        "image/png",
+        5894
+      ],
+      "ok": true
+    }
+  },
+  {
+    "file": "RG1_J2KI.dcm",
+    "source": "NEMA WG04 RG1 (Philips CR thorax) via pydicom-data",
+    "license": "no formal license (NEMA WG04 test data); local use only",
+    "transfer_syntax": "1.2.840.10008.1.2.4.91 (JPEG 2000 Image Compression)",
+    "Modality": "CR",
+    "PhotometricInterpretation": "MONOCHROME1",
+    "BitsAllocated": "16",
+    "BitsStored": "15",
+    "Rows": "1955",
+    "Columns": "1841",
+    "Manufacturer": "Philips Medical Systems",
+    "ViewPosition": "PA",
+    "new_uids": true,
+    "worker_status": "ok",
+    "worker_seconds": 5.461,
+    "scores": {
+      "Mass": 0.317949,
+      "Edema": 0.003201,
+      "Hernia": 0.001582,
+      "Nodule": 0.342928,
+      "Effusion": 0.037227,
+      "Fibrosis": 0.006959,
+      "Emphysema": 0.015194,
+      "Pneumonia": 0.005358,
+      "Atelectasis": 0.020215,
+      "Cardiomegaly": 0.007211,
+      "Infiltration": 0.109487,
+      "Pneumothorax": 0.068787,
+      "Consolidation": 0.022231,
+      "Pleural_Thickening": 0.013996
+    },
+    "top3": [
+      "Nodule",
+      "Mass",
+      "Infiltration"
+    ],
+    "above_threshold": [
+      "Emphysema",
+      "Mass",
+      "Nodule",
+      "Pneumothorax"
+    ],
+    "max_score_diff_vs_local": 2.086162567138672e-07,
+    "scores_match_local": true,
+    "cams_ok": true,
+    "api": {
+      "study_id": "880a2fbd-bf4a0fce-410af35d-3186133d-57349600",
+      "status": "done",
+      "source": "unknown",
+      "image": [
+        200,
+        "image/png",
+        1352588
+      ],
+      "cam": [
+        200,
+        "image/png",
+        5955
+      ],
+      "ok": true
+    }
+  },
+  {
+    "file": "covid19ar_cr.dcm",
+    "source": "TCIA COVID-19-AR, patient COVID-19-AR-16434356 (Fujifilm CR, chest)",
+    "license": "CC BY 4.0",
+    "transfer_syntax": "1.2.840.10008.1.2 (Implicit VR Little Endian)",
+    "Modality": "CR",
+    "PhotometricInterpretation": "MONOCHROME1",
+    "BitsAllocated": "16",
+    "BitsStored": "10",
+    "Rows": "1378",
+    "Columns": "2045",
+    "Manufacturer": "FUJIFILM Corporation",
+    "ViewPosition": "",
+    "new_uids": false,
+    "worker_status": "ok",
+    "worker_seconds": 5.583,
+    "scores": {
+      "Mass": 0.022418,
+      "Edema": 0.018052,
+      "Hernia": 0.000277,
+      "Nodule": 0.054469,
+      "Effusion": 0.01331,
+      "Fibrosis": 0.000517,
+      "Emphysema": 0.001675,
+      "Pneumonia": 0.002904,
+      "Atelectasis": 0.034956,
+      "Cardiomegaly": 0.01342,
+      "Infiltration": 0.051732,
+      "Pneumothorax": 0.008769,
+      "Consolidation": 0.008921,
+      "Pleural_Thickening": 0.003323
+    },
+    "top3": [
+      "Nodule",
+      "Infiltration",
+      "Atelectasis"
+    ],
+    "above_threshold": [],
+    "max_score_diff_vs_local": 7.450580596923828e-08,
+    "scores_match_local": true,
+    "cams_ok": true,
+    "api": {
+      "study_id": "a66cfc07-614ab43d-e7e3708e-20ca3883-df960805",
+      "status": "done",
+      "source": "unknown",
+      "image": [
+        200,
+        "image/png",
+        1200372
+      ],
+      "cam": [
+        200,
+        "image/png",
+        5282
+      ],
+      "ok": true
+    }
+  },
+  {
+    "file": "covid19ar_dx.dcm",
+    "source": "TCIA COVID-19-AR, patient COVID-19-AR-16424105 (Philips MobileDiagnost wDR, chest AP)",
+    "license": "CC BY 4.0",
+    "transfer_syntax": "1.2.840.10008.1.2 (Implicit VR Little Endian)",
+    "Modality": "DX",
+    "PhotometricInterpretation": "MONOCHROME2",
+    "BitsAllocated": "16",
+    "BitsStored": "12",
+    "Rows": "2051",
+    "Columns": "2140",
+    "Manufacturer": "Philips Medical Systems",
+    "ViewPosition": "AP",
+    "new_uids": false,
+    "worker_status": "ok",
+    "worker_seconds": 6.034,
+    "scores": {
+      "Mass": 0.009747,
+      "Edema": 0.001848,
+      "Hernia": 0.002833,
+      "Nodule": 0.017972,
+      "Effusion": 0.030095,
+      "Fibrosis": 0.010951,
+      "Emphysema": 0.003768,
+      "Pneumonia": 0.00202,
+      "Atelectasis": 0.068883,
+      "Cardiomegaly": 0.171301,
+      "Infiltration": 0.036445,
+      "Pneumothorax": 0.003364,
+      "Consolidation": 0.005888,
+      "Pleural_Thickening": 0.012639
+    },
+    "top3": [
+      "Cardiomegaly",
+      "Atelectasis",
+      "Infiltration"
+    ],
+    "above_threshold": [
+      "Cardiomegaly",
+      "Fibrosis"
+    ],
+    "max_score_diff_vs_local": 8.195638656616211e-08,
+    "scores_match_local": true,
+    "cams_ok": true,
+    "api": {
+      "study_id": "50de8ca3-1177afee-fac9038c-610f2eec-931175fa",
+      "status": "done",
+      "source": "unknown",
+      "image": [
+        200,
+        "image/png",
+        1854616
+      ],
+      "cam": [
+        200,
+        "image/png",
+        5159
+      ],
+      "ok": true
+    }
+  }
+]
