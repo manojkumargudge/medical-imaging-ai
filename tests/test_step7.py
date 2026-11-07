@@ -133,6 +133,30 @@ def test_the_worker_touches_its_heartbeat_after_each_study(tmp_path: Path) -> No
     assert heartbeat.stat().st_mtime_ns >= seen[2]
 
 
+def test_a_restart_ignores_the_old_heartbeat_until_the_models_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A restarted container keeps /tmp, so main() removes the old heartbeat first and touches
+    it again once the models are loaded."""
+    from src.service import worker as worker_module
+
+    heartbeat = tmp_path / "heartbeat"
+    heartbeat.touch()  # left by the previous run
+    monkeypatch.chdir(tmp_path)  # no .env here
+    monkeypatch.setenv("WORKER_HEARTBEAT", str(heartbeat))
+    monkeypatch.delenv("RESULTS_DB_URL", raising=False)
+    while_loading: list[bool] = []
+
+    def load() -> list[Any]:
+        while_loading.append(heartbeat.exists())
+        return []
+
+    monkeypatch.setattr(worker_module, "analyzers_from_env", load)
+    with pytest.raises(ValueError, match="RESULTS_DB_URL"):  # stops main before Postgres
+        worker_module.main([])
+    assert while_loading == [False] and heartbeat.exists()
+
+
 def test_timing_drops_the_warm_up_runs() -> None:
     summary = timing.summarise([60.0, 20.0, 30.0, 25.0, 22.0, 40.0], warm_up=1)
     assert summary == {

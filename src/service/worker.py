@@ -154,6 +154,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     torch.set_num_threads(int(os.environ.get("WORKER_THREADS", "4")))
     heartbeat_env = os.environ.get("WORKER_HEARTBEAT")
     heartbeat = Path(heartbeat_env) if heartbeat_env else None
+    if heartbeat is not None:
+        # A restarted container keeps /tmp: an old heartbeat must not count before this start.
+        heartbeat.unlink(missing_ok=True)
     analyzers = analyzers_from_env()
     for analyzer in analyzers:
         print(f"{analyzer.name}: {analyzer.checkpoint_name} sha256 {analyzer.checkpoint_sha256}")

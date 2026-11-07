@@ -77,8 +77,9 @@ what a fresh clone took on the development laptop.
 
 Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
-service has a healthcheck (the worker's reads a heartbeat file it touches after loading the
-models, after each study and after each poll; its start period is 180 s), each
+service has a healthcheck (the worker's reads a heartbeat file that it deletes on start, then
+touches after loading the models, after each study and after each poll; its start period is
+180 s), each
 waits for the services it needs, every port is bound to 127.0.0.1, and every image is pinned to
 a version. `docker compose down` stops and removes the containers and
 keeps the volumes (Orthanc studies, results database); do not add `-v` unless you mean to delete
