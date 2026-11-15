@@ -44,16 +44,22 @@ what a fresh clone took on the development laptop.
    python -m venv .venv
    .venv\Scripts\python -m pip install -e ".[dev,api]"
    ```
-2. **Checkpoints.** Copy the two trained checkpoints from the Drive folder `MyDrive/aiml02-runs/`
-   (`classifier/epoch_003.pt`, `segmentation/epoch_180.pt`) to `C:\aiml02-checkpoints\`, outside
-   the repository. Their sha256 values are listed under Inference worker.
-3. **Settings:**
+2. **Settings:**
    ```powershell
    Copy-Item .env.example .env   # then set ORTHANC_PASSWORD and RESULTS_DB_PASSWORD
    ```
-   The checkpoint paths in `.env.example` already point to `C:\aiml02-checkpoints\`. To run a
-   second copy of the stack, stop the first one and add `COMPOSE_PROJECT_NAME=<another name>`
-   to its `.env`, so its containers and volumes are separate (the ports are the same).
+   The checkpoint paths in `.env.example` point to `C:\aiml02-checkpoints\`, outside the
+   repository; change `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` for another place.
+   To run a second copy of the stack, stop the first one and add
+   `COMPOSE_PROJECT_NAME=<another name>` to its `.env`, so its containers and volumes are
+   separate (the ports are the same).
+3. **Checkpoints** (142 MB from the GitHub release
+   [v1.0-models](https://github.com/manojkumargudge/medical-imaging-ai/releases/tag/v1.0-models),
+   sha256-checked, never overwritten). Do this before the first `docker compose up`: Docker
+   creates an empty folder where a missing checkpoint should be.
+   ```powershell
+   .venv\Scripts\python -m scripts.fetch_checkpoints
+   ```
 4. **Demo data** (the Kaggle downloads need no account):
    ```powershell
    .venv\Scripts\kaggle datasets download nih-chest-xrays/data -f Data_Entry_2017.csv -p data/raw
@@ -264,6 +270,11 @@ General limits and bias are in [docs/limitations.md](docs/limitations.md). For D
 - **Landscape images are squashed** to 224x224, as in training (a plain resize). The
   Fujifilm CR is 2045 wide by 1378 high, so the model sees it distorted. The overlay is
   stretched back over the full image, so it lines up with what the model saw.
+- **No view code for PA/AP.** Our DX files set ViewPosition but no ViewCodeSequence. This is
+  the last dciodvfy warning on them, besides the deliberately empty study date, time and ID.
+- **The worker image is not built in CI.** CI builds the API and frontend images (integration
+  job) but not `Dockerfile` (torch, MONAI), so a broken worker build is only found on a local
+  `docker compose up --build`.
 
 ## Data versioning (DVC remote on Google Drive)
 
@@ -562,8 +573,14 @@ Results go to the Postgres table `inference_results`:
 The worker runs CPU only. The image (`Dockerfile`) holds code and configs only. The checkpoints
 are files on this machine, kept in `C:\aiml02-checkpoints\` (outside the repository):
 
-- `epoch_003.pt`: the classifier, sha256 `1a35108e…501708`
-- `epoch_180.pt`: the U-Net, sha256 `8839d537…26cc36`
+- `epoch_003.pt`: the classifier, sha256 `1a35108eeeac9726b9f9d718e737c9d42a7325b40fcbdc9e08d46de96b501708`
+- `epoch_180.pt`: the U-Net, sha256 `8839d5379168dd6c64e869356a86eeed72cfc9bb7409d3386d721096ac26cc36`
+
+Both are assets of the GitHub release
+[v1.0-models](https://github.com/manojkumargudge/medical-imaging-ai/releases/tag/v1.0-models).
+`python -m scripts.fetch_checkpoints` downloads them to the paths in `.env` and checks these
+values. If a checkpoint is missing, the worker logs which file and how to get it, then waits
+(unhealthy) instead of restarting.
 
 They are set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in `.env` and mounted
 read-only. They are never in the image or in git, and a test checks both. The worker logs each

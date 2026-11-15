@@ -37,6 +37,9 @@ services:
       retries: 3
       start_period: 180s
     volumes:
+      # A missing checkpoint file would be mounted as an empty folder (Docker Desktop creates the
+      # host path); the worker then says so in its log and waits, unhealthy, without restarting.
+      # Get the files with: python -m scripts.fetch_checkpoints
       - ${CLASSIFIER_CHECKPOINT:?set CLASSIFIER_CHECKPOINT in .env}:/checkpoints/classifier.pt:ro
       - ${SEGMENTATION_CHECKPOINT:?set SEGMENTATION_CHECKPOINT in .env}:/checkpoints/segmentation.pt:ro
       - ${WORKER_RESULTS_DIR:-./results/worker}:/results

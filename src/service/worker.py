@@ -134,6 +134,22 @@ class Worker:
                 self.beat()
 
 
+CHECKPOINT_SETTINGS = ("CLASSIFIER_CHECKPOINT", "SEGMENTATION_CHECKPOINT")
+
+
+def missing_checkpoints() -> list[str]:
+    """The configured checkpoint paths that are not files. (Docker mounts a missing host file
+    as an empty folder unless told not to, so a folder counts as missing.)"""
+    paths = [os.environ[key] for key in CHECKPOINT_SETTINGS if os.environ.get(key)]
+    return [path for path in paths if not Path(path).is_file()]
+
+
+def idle() -> None:
+    """Wait without a heartbeat: the container shows as unhealthy instead of restarting."""
+    while True:
+        time.sleep(3600)
+
+
 def analyzers_from_env() -> list[Analyzer]:
     analyzers: list[Analyzer] = []
     classifier = os.environ.get("CLASSIFIER_CHECKPOINT")
@@ -157,6 +173,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     if heartbeat is not None:
         # A restarted container keeps /tmp: an old heartbeat must not count before this start.
         heartbeat.unlink(missing_ok=True)
+    missing = missing_checkpoints()
+    if missing:
+        print(
+            f"checkpoint file(s) not found: {', '.join(missing)}. On the host, run "
+            "`python -m scripts.fetch_checkpoints` (it downloads them to the paths in .env and "
+            "checks their sha256), then restart the worker. Waiting, not restarting.",
+            flush=True,
+        )
+        idle()
+        return
     analyzers = analyzers_from_env()
     for analyzer in analyzers:
         print(f"{analyzer.name}: {analyzer.checkpoint_name} sha256 {analyzer.checkpoint_sha256}")

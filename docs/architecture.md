@@ -55,15 +55,18 @@ flowchart LR
 - **Training (offline).** The data is versioned with DVC; the remote is a Google Drive folder.
   The Colab notebooks preprocess the NIH images, train the DenseNet121 classifier and the MONAI
   3D U-Net on a GPU, and write the checkpoints and metrics (`reports/`). Training is not part of
-  the running stack and cannot be run from it. The checkpoints are copied by hand to
-  `C:\aiml02-checkpoints\` and mounted read-only into the worker; they are never in git or in an
+  the running stack and cannot be run from it. The checkpoints are published as the GitHub
+  release `v1.0-models`; `scripts/fetch_checkpoints.py` downloads them (sha256-checked) to
+  `C:\aiml02-checkpoints\`, and they are mounted read-only into the worker; they are never in git or in an
   image.
 - **Orthanc** stores the DICOM studies. Its REST API needs a password, and its ports are bound
   to 127.0.0.1. A study becomes `StableStudy` 5 s after its last instance arrives.
 - **Inference worker** (`src/service/worker.py`) follows Orthanc's change log. For each new
   stable study it runs the classifier with Grad-CAM on DX/CR series and the U-Net on CT series,
   writes the output files to the results folder and one row per (study, checkpoint) to the
-  results database. It keeps its place in the change log, so a restart resumes.
+  results database. It keeps its place in the change log, so a restart resumes. Besides the
+  converted demo studies, four real scanner chest X-rays (CR MONOCHROME1 incl. JPEG 2000, DX
+  MONOCHROME2) went through this path on the test stack (README "Real scanner DICOMs").
 - **Results database** (Postgres, `migrations/`): `inference_results` and `worker_state` (the
   worker's), `reviews`, `audit_log` and `uploads` (the viewer's). `reviews` and `audit_log` are
   append-only: triggers refuse UPDATE, DELETE and TRUNCATE. A trigger on `inference_results` adds
