@@ -60,7 +60,7 @@ what a fresh clone took on the development laptop.
    ```powershell
    .venv\Scripts\python -m scripts.fetch_checkpoints
    ```
-4. **Demo data** (the Kaggle downloads need no account):
+4. **Demo data** (Kaggle account and API token: see the note below the commands):
    ```powershell
    .venv\Scripts\kaggle datasets download nih-chest-xrays/data -f Data_Entry_2017.csv -p data/raw
    Expand-Archive data/raw/Data_Entry_2017.csv.zip -DestinationPath data/raw
@@ -70,6 +70,12 @@ what a fresh clone took on the development laptop.
    .venv\Scripts\python -m src.data.spleen download --root data/raw   # about 1.5 GB, 12 min
    ```
    `-p data/raw/demo` is right: Kaggle keeps the `images_001/images/` part of the path.
+   Kaggle: on 2026-11-15 these three downloads worked with no Kaggle credentials on the machine
+   (Kaggle CLI 2.2.5). Kaggle can require sign-in for dataset downloads; if the CLI asks for
+   credentials, create a Kaggle account, download an API token (Settings → API → Create New
+   Token) and save it as `%USERPROFILE%\.kaggle\kaggle.json`. Never commit it (`.gitignore`
+   lists `kaggle.json`). The spleen download (1.5 GB) can stop part way on a slow connection;
+   rerun the same command, since it starts over until the md5-checked archive is complete.
 5. **Start, migrate, load** (the first `--build` took about 13 min; later starts take under a
    minute):
    ```powershell
