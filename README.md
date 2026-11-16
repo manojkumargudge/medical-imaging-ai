@@ -84,8 +84,9 @@ what a fresh clone took on the development laptop.
    .venv\Scripts\python -m scripts.upload_demo   # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
    ```
    The worker processes the 3 studies in about 90 s; the worklist shows them as Done.
-6. **Checks:** `.venv\Scripts\python -m pytest` (330 passed, 28 skipped on a fresh clone: the
-   skipped tests need the full datasets or the integration test stack).
+6. **Checks:** `.venv\Scripts\python -m pytest` (348 passed, 37 skipped on a fresh clone with the
+   demo data above, 2026-11-16: the skipped tests need the full datasets, the real-scanner
+   DICOMs, dciodvfy or the integration test stack).
 
 Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
