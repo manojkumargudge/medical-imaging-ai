@@ -74,8 +74,13 @@ what a fresh clone took on the development laptop.
    (Kaggle CLI 2.2.5). Kaggle can require sign-in for dataset downloads; if the CLI asks for
    credentials, create a Kaggle account, download an API token (Settings → API → Create New
    Token) and save it as `%USERPROFILE%\.kaggle\kaggle.json`. Never commit it (`.gitignore`
-   lists `kaggle.json`). The spleen download (1.5 GB) can stop part way on a slow connection;
-   rerun the same command, since it starts over until the md5-checked archive is complete.
+   lists `kaggle.json`). The spleen download (1.5 GB) can stop part way on a slow connection, and
+   rerunning the command starts over. To resume instead, fetch the archive with curl (rerun it
+   to continue from where it stopped), then run the `src.data.spleen download` command above: it
+   checks the md5 (`410d4a301da4e5b2f6f86ec3ddba524e`), skips the download and extracts.
+   ```powershell
+   curl.exe -L -C - --retry 3 --retry-all-errors --speed-limit 10000 --speed-time 60 -o data/raw/Task09_Spleen.tar https://msd-for-monai.s3-us-west-2.amazonaws.com/Task09_Spleen.tar
+   ```
 5. **Start, migrate, load** (the first `--build` took about 13 min; later starts take under a
    minute):
    ```powershell
