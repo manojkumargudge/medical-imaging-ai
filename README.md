@@ -44,17 +44,23 @@ what a fresh clone took on the development laptop.
    python -m venv .venv
    .venv\Scripts\python -m pip install -e ".[dev,api]"
    ```
-2. **Checkpoints.** Copy the two trained checkpoints from the Drive folder `MyDrive/aiml02-runs/`
-   (`classifier/epoch_003.pt`, `segmentation/epoch_180.pt`) to `C:\aiml02-checkpoints\`, outside
-   the repository. Their sha256 values are listed under Inference worker.
-3. **Settings:**
+2. **Settings:**
    ```powershell
    Copy-Item .env.example .env   # then set ORTHANC_PASSWORD and RESULTS_DB_PASSWORD
    ```
-   The checkpoint paths in `.env.example` already point to `C:\aiml02-checkpoints\`. To run a
-   second copy of the stack, stop the first one and add `COMPOSE_PROJECT_NAME=<another name>`
-   to its `.env`, so its containers and volumes are separate (the ports are the same).
-4. **Demo data** (the Kaggle downloads need no account):
+   The checkpoint paths in `.env.example` point to `C:\aiml02-checkpoints\`, outside the
+   repository; change `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` for another place.
+   To run a second copy of the stack, stop the first one and add
+   `COMPOSE_PROJECT_NAME=<another name>` to its `.env`, so its containers and volumes are
+   separate (the ports are the same).
+3. **Checkpoints** (142 MB from the GitHub release
+   [v1.0-models](https://github.com/manojkumargudge/medical-imaging-ai/releases/tag/v1.0-models),
+   sha256-checked, never overwritten). Do this before the first `docker compose up`: Docker
+   creates an empty folder where a missing checkpoint should be.
+   ```powershell
+   .venv\Scripts\python -m scripts.fetch_checkpoints
+   ```
+4. **Demo data** (Kaggle account and API token: see the note below the commands):
    ```powershell
    .venv\Scripts\kaggle datasets download nih-chest-xrays/data -f Data_Entry_2017.csv -p data/raw
    Expand-Archive data/raw/Data_Entry_2017.csv.zip -DestinationPath data/raw
@@ -64,6 +70,17 @@ what a fresh clone took on the development laptop.
    .venv\Scripts\python -m src.data.spleen download --root data/raw   # about 1.5 GB, 12 min
    ```
    `-p data/raw/demo` is right: Kaggle keeps the `images_001/images/` part of the path.
+   Kaggle: on 2026-11-15 these three downloads worked with no Kaggle credentials on the machine
+   (Kaggle CLI 2.2.5). Kaggle can require sign-in for dataset downloads; if the CLI asks for
+   credentials, create a Kaggle account, download an API token (Settings → API → Create New
+   Token) and save it as `%USERPROFILE%\.kaggle\kaggle.json`. Never commit it (`.gitignore`
+   lists `kaggle.json`). The spleen download (1.5 GB) can stop part way on a slow connection, and
+   rerunning the command starts over. To resume instead, fetch the archive with curl (rerun it
+   to continue from where it stopped), then run the `src.data.spleen download` command above: it
+   checks the md5 (`410d4a301da4e5b2f6f86ec3ddba524e`), skips the download and extracts.
+   ```powershell
+   curl.exe -L -C - --retry 3 --retry-all-errors --speed-limit 10000 --speed-time 60 -o data/raw/Task09_Spleen.tar https://msd-for-monai.s3-us-west-2.amazonaws.com/Task09_Spleen.tar
+   ```
 5. **Start, migrate, load** (the first `--build` took about 13 min; later starts take under a
    minute):
    ```powershell
@@ -72,8 +89,9 @@ what a fresh clone took on the development laptop.
    .venv\Scripts\python -m scripts.upload_demo   # the 3 demo studies (2 NIH DX, MSD spleen_14 CT)
    ```
    The worker processes the 3 studies in about 90 s; the worklist shows them as Done.
-6. **Checks:** `.venv\Scripts\python -m pytest` (330 passed, 28 skipped on a fresh clone: the
-   skipped tests need the full datasets or the integration test stack).
+6. **Checks:** `.venv\Scripts\python -m pytest` (348 passed, 37 skipped on a fresh clone with the
+   demo data above, 2026-11-16: the skipped tests need the full datasets, the real-scanner
+   DICOMs, dciodvfy or the integration test stack).
 
 Then open http://127.0.0.1:8080. `compose.yaml` merges `docker-compose.base.yml`,
 `docker-compose.worker.yml`, `docker-compose.api.yml` and `docker-compose.frontend.yml`. Every
@@ -264,6 +282,11 @@ General limits and bias are in [docs/limitations.md](docs/limitations.md). For D
 - **Landscape images are squashed** to 224x224, as in training (a plain resize). The
   Fujifilm CR is 2045 wide by 1378 high, so the model sees it distorted. The overlay is
   stretched back over the full image, so it lines up with what the model saw.
+- **No view code for PA/AP.** Our DX files set ViewPosition but no ViewCodeSequence. This is
+  the last dciodvfy warning on them, besides the deliberately empty study date, time and ID.
+- **The worker image is not built in CI.** CI builds the API and frontend images (integration
+  job) but not `Dockerfile` (torch, MONAI), so a broken worker build is only found on a local
+  `docker compose up --build`.
 
 ## Data versioning (DVC remote on Google Drive)
 
@@ -562,8 +585,14 @@ Results go to the Postgres table `inference_results`:
 The worker runs CPU only. The image (`Dockerfile`) holds code and configs only. The checkpoints
 are files on this machine, kept in `C:\aiml02-checkpoints\` (outside the repository):
 
-- `epoch_003.pt`: the classifier, sha256 `1a35108e…501708`
-- `epoch_180.pt`: the U-Net, sha256 `8839d537…26cc36`
+- `epoch_003.pt`: the classifier, sha256 `1a35108eeeac9726b9f9d718e737c9d42a7325b40fcbdc9e08d46de96b501708`
+- `epoch_180.pt`: the U-Net, sha256 `8839d5379168dd6c64e869356a86eeed72cfc9bb7409d3386d721096ac26cc36`
+
+Both are assets of the GitHub release
+[v1.0-models](https://github.com/manojkumargudge/medical-imaging-ai/releases/tag/v1.0-models).
+`python -m scripts.fetch_checkpoints` downloads them to the paths in `.env` and checks these
+values. If a checkpoint is missing, the worker logs which file and how to get it, then waits
+(unhealthy) instead of restarting.
 
 They are set as `CLASSIFIER_CHECKPOINT` and `SEGMENTATION_CHECKPOINT` in `.env` and mounted
 read-only. They are never in the image or in git, and a test checks both. The worker logs each

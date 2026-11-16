@@ -72,6 +72,10 @@ image's left, and labels the edges A, P, R, L.
   CT spleen_14 13.7 s (12.2-18.7). The first run in a new process is slower (CT 66.6 s). Source:
   `reports/worker_timing.json`.
 - **CT upload is not supported:** a CT needs a full series, and the upload takes one file.
+- **Few real scanner files.** Four real chest X-ray DICOMs (two scanners' CR MONOCHROME1,
+  including JPEG 2000, and one DX MONOCHROME2) were read, run and displayed on the test stack.
+  Their scores mean nothing, since the model was trained on NIH PNGs. Other formats are
+  untested (README "Real scanner DICOMs" and "Known limitations").
 - **Large direct uploads.** A request sent straight to the API (port 8000) is received in full
   before the 20 MB check rejects it; through the frontend, nginx caps the body at 21 MB.
 - **Orphan uploads.** If the database write fails after Orthanc stored an upload, the study stays
