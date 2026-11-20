@@ -125,9 +125,16 @@ refreshes every 3 s while a study is processing (README "Viewer").
 **Click:** open DX 00000116_000 from the worklist. Grad-CAM overlay on; label Cardiomegaly;
 move Opacity. Scroll the scores table to Cardiomegaly, then to a Low reliability label (for
 example Infiltration) and to Hernia ("Score only (no threshold)"). In the review panel:
-Approve, your name, Save review. Then open the uploaded study: Reject, your name, a comment
-such as "Not an NIH image; outside the model's scope", Save review. Finally, Audit log in
-the header.
+Approve, your name, Save review. Then open the uploaded study from the worklist (study name
+"Upload <id>", source upload). **Before Reject, confirm the header:** it must read "DX study,
+patient COVID-19-AR-16424105" (for the retake file `covid19ar_cr.dcm`: "CR study, patient
+COVID-19-AR-16434356"), with the model-scope warning under it. A demo study shows an NIH
+patient number and no warning; if you see that, go back to the worklist. On a take on
+2026-11-20, a reject meant for the upload was saved on a demo DX study, and a saved review
+cannot be undone. Then Reject, your name, and the comment
+"Out of distribution: TCIA DX, model trained on NIH only" (for `covid19ar_cr.dcm`:
+"Out of distribution: TCIA CR, model trained on NIH only"), Save review. Finally, Audit log
+in the header.
 
 **Say:**
 - "Cardiomegaly scores 0.734 here against a threshold of 0.0248, so it is above. The map sits

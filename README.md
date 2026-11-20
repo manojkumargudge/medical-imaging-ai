@@ -284,6 +284,12 @@ General limits and bias are in [docs/limitations.md](docs/limitations.md). For D
   stretched back over the full image, so it lines up with what the model saw.
 - **No view code for PA/AP.** Our DX files set ViewPosition but no ViewCodeSequence. This is
   the last dciodvfy warning on them, besides the deliberately empty study date, time and ID.
+- **Restart the frontend after the API restarts.** nginx resolves the `api` host name once, when
+  the frontend container starts (`proxy_pass http://api:8000` with no `resolver`). If the API
+  container is stopped and started, it can get a new address, and every `/api` request through
+  the viewer then answers 502 while the API itself answers 200 on port 8000 (seen on
+  2026-11-20). Run `docker compose restart frontend`. Fix, after submission: `resolver
+  127.0.0.11` (Docker's DNS) and a variable in `proxy_pass`, so nginx looks the name up again.
 - **The worker image is not built in CI.** CI builds the API and frontend images (integration
   job) but not `Dockerfile` (torch, MONAI), so a broken worker build is only found on a local
   `docker compose up --build`.
